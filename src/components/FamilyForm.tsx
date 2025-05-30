@@ -55,15 +55,29 @@ const childSpouseSchema = z.object({
   nativePlace: z.string().min(1, 'Native place is required'),
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   occupation: z.enum(['retired', 'housewife', 'salaried', 'business']),
+  numberOfChildren: z.number().min(0).max(20),
+});
+
+const grandchildSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
+  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  occupation: z.enum(['salaried', 'business', 'student', 'unemployed']),
+  currentPlace: z.string().min(1, 'Current place is required'),
+  phoneNumber: z.string().regex(/^\d+$/, 'Phone number must contain only numbers'),
 });
 
 type FamilyHeadData = z.infer<typeof familyHeadSchema>;
 type SpouseData = z.infer<typeof spouseSchema>;
 type ChildData = z.infer<typeof childSchema>;
 type ChildSpouseData = z.infer<typeof childSpouseSchema>;
+type GrandchildData = z.infer<typeof grandchildSchema>;
 
 interface ChildWithSpouse extends ChildData {
-  spouse?: ChildSpouseData;
+  spouse?: ChildSpouseData & {
+    grandchildren?: GrandchildData[];
+  };
 }
 
 const FamilyForm = () => {
@@ -135,6 +149,8 @@ const FamilyForm = () => {
             nativePlace: '',
             dateOfBirth: new Date(),
             occupation: 'housewife',
+            numberOfChildren: 0,
+            grandchildren: [],
           };
         } else {
           delete newSons[index].spouse;
@@ -156,6 +172,8 @@ const FamilyForm = () => {
             nativePlace: '',
             dateOfBirth: new Date(),
             occupation: 'salaried',
+            numberOfChildren: 0,
+            grandchildren: [],
           };
         } else {
           delete newDaughters[index].spouse;
@@ -171,12 +189,64 @@ const FamilyForm = () => {
       const newSons = [...sons];
       if (newSons[index].spouse) {
         newSons[index].spouse = { ...newSons[index].spouse!, [field]: value };
+        
+        // If numberOfChildren changes, update grandchildren array
+        if (field === 'numberOfChildren') {
+          const newGrandchildren = Array(value).fill(null).map(() => ({
+            firstName: '',
+            lastName: '',
+            contactNumber: '',
+            dateOfBirth: new Date(),
+            occupation: 'student' as const,
+            currentPlace: '',
+            phoneNumber: '',
+          }));
+          newSons[index].spouse!.grandchildren = newGrandchildren;
+        }
+        
         setSons(newSons);
       }
     } else {
       const newDaughters = [...daughters];
       if (newDaughters[index].spouse) {
         newDaughters[index].spouse = { ...newDaughters[index].spouse!, [field]: value };
+        
+        // If numberOfChildren changes, update grandchildren array
+        if (field === 'numberOfChildren') {
+          const newGrandchildren = Array(value).fill(null).map(() => ({
+            firstName: '',
+            lastName: '',
+            contactNumber: '',
+            dateOfBirth: new Date(),
+            occupation: 'student' as const,
+            currentPlace: '',
+            phoneNumber: '',
+          }));
+          newDaughters[index].spouse!.grandchildren = newGrandchildren;
+        }
+        
+        setDaughters(newDaughters);
+      }
+    }
+  };
+
+  const updateGrandchild = (type: 'son' | 'daughter', childIndex: number, grandchildIndex: number, field: keyof GrandchildData, value: any) => {
+    if (type === 'son') {
+      const newSons = [...sons];
+      if (newSons[childIndex].spouse?.grandchildren) {
+        newSons[childIndex].spouse!.grandchildren![grandchildIndex] = {
+          ...newSons[childIndex].spouse!.grandchildren![grandchildIndex],
+          [field]: value
+        };
+        setSons(newSons);
+      }
+    } else {
+      const newDaughters = [...daughters];
+      if (newDaughters[childIndex].spouse?.grandchildren) {
+        newDaughters[childIndex].spouse!.grandchildren![grandchildIndex] = {
+          ...newDaughters[childIndex].spouse!.grandchildren![grandchildIndex],
+          [field]: value
+        };
         setDaughters(newDaughters);
       }
     }
@@ -203,6 +273,109 @@ const FamilyForm = () => {
       }
     });
   };
+
+  const renderGrandchildForm = (grandchild: GrandchildData, childIndex: number, grandchildIndex: number, childType: 'son' | 'daughter') => (
+    <div key={grandchildIndex} className="border rounded-lg p-4 bg-yellow-50 space-y-4">
+      <h4 className="text-md font-semibold text-orange-700">Grandchild {grandchildIndex + 1}</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label>First Name</Label>
+          <Input
+            placeholder="Enter first name"
+            value={grandchild.firstName}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'firstName', e.target.value)}
+          />
+        </div>
+        
+        <div>
+          <Label>Last Name</Label>
+          <Input
+            placeholder="Enter last name"
+            value={grandchild.lastName}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'lastName', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Contact Number</Label>
+          <Input
+            placeholder="Enter contact number"
+            value={grandchild.contactNumber}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'contactNumber', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Date of Birth</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {grandchild.dateOfBirth ? (
+                  <>
+                    {format(grandchild.dateOfBirth, "PPP")} 
+                    (Age: {calculateAge(grandchild.dateOfBirth)})
+                  </>
+                ) : (
+                  <span>Pick a date</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={grandchild.dateOfBirth}
+                onSelect={(date) => {
+                  if (date) {
+                    updateGrandchild(childType, childIndex, grandchildIndex, 'dateOfBirth', date);
+                  }
+                }}
+                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div>
+          <Label>Occupation</Label>
+          <Select onValueChange={(value) => updateGrandchild(childType, childIndex, grandchildIndex, 'occupation', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select occupation" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="salaried">Salaried</SelectItem>
+              <SelectItem value="business">Business</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="unemployed">Unemployed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Current Place</Label>
+          <Input
+            placeholder="Enter current place"
+            value={grandchild.currentPlace}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'currentPlace', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Phone Number</Label>
+          <Input
+            placeholder="Enter phone number"
+            value={grandchild.phoneNumber}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'phoneNumber', e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   const renderChildForm = (child: ChildWithSpouse, index: number, type: 'son' | 'daughter') => (
     <div key={index} className="border rounded-lg p-4 bg-gray-50 space-y-4">
@@ -322,7 +495,7 @@ const FamilyForm = () => {
 
       {/* Spouse section for married children */}
       {child.maritalStatus === 'married' && child.spouse && (
-        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-4">
           <h4 className="text-md font-semibold text-blue-700 mb-3">{type === 'son' ? 'Wife' : 'Husband'} Information</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -411,7 +584,31 @@ const FamilyForm = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <Label>Number of Children</Label>
+              <Select onValueChange={(value) => updateChildSpouse(type, index, 'numberOfChildren', parseInt(value))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select number of children" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 11 }, (_, i) => (
+                    <SelectItem key={i} value={i.toString()}>{i}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {/* Grandchildren section */}
+          {child.spouse.numberOfChildren > 0 && child.spouse.grandchildren && (
+            <div className="mt-4 space-y-4">
+              <h5 className="text-lg font-semibold text-orange-700">Grandchildren</h5>
+              {child.spouse.grandchildren.map((grandchild, grandchildIndex) => 
+                renderGrandchildForm(grandchild, index, grandchildIndex, type)
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
