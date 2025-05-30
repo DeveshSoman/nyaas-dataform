@@ -141,13 +141,16 @@ const FamilyForm = () => {
   };
 
   const updateChild = (type: 'son' | 'daughter', index: number, field: keyof ChildData, value: any) => {
+    // Convert string values to uppercase
+    const processedValue = typeof value === 'string' ? value.toUpperCase() : value;
+    
     if (type === 'son') {
       const newSons = [...sons];
-      newSons[index] = { ...newSons[index], [field]: value };
+      newSons[index] = { ...newSons[index], [field]: processedValue };
       
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
-        if (value === 'married') {
+        if (processedValue === 'MARRIED') {
           newSons[index].spouse = {
             firstName: '',
             lastName: '',
@@ -166,11 +169,11 @@ const FamilyForm = () => {
       setSons(newSons);
     } else {
       const newDaughters = [...daughters];
-      newDaughters[index] = { ...newDaughters[index], [field]: value };
+      newDaughters[index] = { ...newDaughters[index], [field]: processedValue };
       
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
-        if (value === 'married') {
+        if (processedValue === 'MARRIED') {
           newDaughters[index].spouse = {
             firstName: '',
             lastName: '',
@@ -191,14 +194,17 @@ const FamilyForm = () => {
   };
 
   const updateChildSpouse = (type: 'son' | 'daughter', index: number, field: keyof ChildSpouseData, value: any) => {
+    // Convert string values to uppercase
+    const processedValue = typeof value === 'string' ? value.toUpperCase() : value;
+    
     if (type === 'son') {
       const newSons = [...sons];
       if (newSons[index].spouse) {
-        newSons[index].spouse = { ...newSons[index].spouse!, [field]: value };
+        newSons[index].spouse = { ...newSons[index].spouse!, [field]: processedValue };
         
         // If numberOfChildren changes, update grandchildren array
         if (field === 'numberOfChildren') {
-          const newGrandchildren = Array(value).fill(null).map(() => ({
+          const newGrandchildren = Array(processedValue).fill(null).map(() => ({
             firstName: '',
             lastName: '',
             contactNumber: '',
@@ -215,11 +221,11 @@ const FamilyForm = () => {
     } else {
       const newDaughters = [...daughters];
       if (newDaughters[index].spouse) {
-        newDaughters[index].spouse = { ...newDaughters[index].spouse!, [field]: value };
+        newDaughters[index].spouse = { ...newDaughters[index].spouse!, [field]: processedValue };
         
         // If numberOfChildren changes, update grandchildren array
         if (field === 'numberOfChildren') {
-          const newGrandchildren = Array(value).fill(null).map(() => ({
+          const newGrandchildren = Array(processedValue).fill(null).map(() => ({
             firstName: '',
             lastName: '',
             contactNumber: '',
@@ -237,12 +243,15 @@ const FamilyForm = () => {
   };
 
   const updateGrandchild = (type: 'son' | 'daughter', childIndex: number, grandchildIndex: number, field: keyof GrandchildData, value: any) => {
+    // Convert string values to uppercase
+    const processedValue = typeof value === 'string' ? value.toUpperCase() : value;
+    
     if (type === 'son') {
       const newSons = [...sons];
       if (newSons[childIndex].spouse?.grandchildren) {
         newSons[childIndex].spouse!.grandchildren![grandchildIndex] = {
           ...newSons[childIndex].spouse!.grandchildren![grandchildIndex],
-          [field]: value
+          [field]: processedValue
         };
         setSons(newSons);
       }
@@ -251,7 +260,7 @@ const FamilyForm = () => {
       if (newDaughters[childIndex].spouse?.grandchildren) {
         newDaughters[childIndex].spouse!.grandchildren![grandchildIndex] = {
           ...newDaughters[childIndex].spouse!.grandchildren![grandchildIndex],
-          [field]: value
+          [field]: processedValue
         };
         setDaughters(newDaughters);
       }
@@ -285,34 +294,34 @@ const FamilyForm = () => {
       <h4 className="text-md font-semibold text-orange-700">Grandchild {grandchildIndex + 1}</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>First Name</Label>
+          <Label>First Name / पहिले नाव</Label>
           <Input
-            placeholder="Enter first name"
+            placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
             value={grandchild.firstName}
             onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'firstName', e.target.value)}
           />
         </div>
         
         <div>
-          <Label>Last Name</Label>
+          <Label>Last Name / आडनाव</Label>
           <Input
-            placeholder="Enter last name"
+            placeholder="Enter last name / आडनाव प्रविष्ट करा"
             value={grandchild.lastName}
             onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'lastName', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Contact Number</Label>
+          <Label>Contact Number / संपर्क क्रमांक</Label>
           <Input
-            placeholder="Enter contact number"
+            placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
             value={grandchild.contactNumber}
             onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'contactNumber', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Date of Birth</Label>
+          <Label>Date of Birth / जन्म तारीख</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -326,7 +335,7 @@ const FamilyForm = () => {
                     (Age: {calculateAge(grandchild.dateOfBirth)})
                   </>
                 ) : (
-                  <span>Pick a date</span>
+                  <span>Pick a date / तारीख निवडा</span>
                 )}
               </Button>
             </PopoverTrigger>
@@ -348,33 +357,33 @@ const FamilyForm = () => {
         </div>
 
         <div>
-          <Label>Occupation</Label>
+          <Label>Occupation / व्यवसाय</Label>
           <Select onValueChange={(value) => updateGrandchild(childType, childIndex, grandchildIndex, 'occupation', value)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select occupation" />
+              <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="salaried">Salaried</SelectItem>
-              <SelectItem value="business">Business</SelectItem>
-              <SelectItem value="student">Student</SelectItem>
-              <SelectItem value="unemployed">Unemployed</SelectItem>
+              <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
+              <SelectItem value="business">Business / व्यवसाय</SelectItem>
+              <SelectItem value="student">Student / विद्यार्थी</SelectItem>
+              <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <Label>Current Place</Label>
+          <Label>Current Place / सध्याचे ठिकाण</Label>
           <Input
-            placeholder="Enter current place"
+            placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
             value={grandchild.currentPlace}
             onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'currentPlace', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Phone Number</Label>
+          <Label>Phone Number / फोन नंबर</Label>
           <Input
-            placeholder="Enter phone number"
+            placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
             value={grandchild.phoneNumber}
             onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'phoneNumber', e.target.value)}
           />
@@ -388,34 +397,34 @@ const FamilyForm = () => {
       <h3 className="text-lg font-semibold text-purple-700 capitalize">{type} {index + 1}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>First Name</Label>
+          <Label>First Name / पहिले नाव</Label>
           <Input
-            placeholder="Enter first name"
+            placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
             value={child.firstName}
             onChange={(e) => updateChild(type, index, 'firstName', e.target.value)}
           />
         </div>
         
         <div>
-          <Label>Last Name</Label>
+          <Label>Last Name / आडनाव</Label>
           <Input
-            placeholder="Enter last name"
+            placeholder="Enter last name / आडनाव प्रविष्ट करा"
             value={child.lastName}
             onChange={(e) => updateChild(type, index, 'lastName', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Contact Number</Label>
+          <Label>Contact Number / संपर्क क्रमांक</Label>
           <Input
-            placeholder="Enter contact number"
+            placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
             value={child.contactNumber}
             onChange={(e) => updateChild(type, index, 'contactNumber', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Date of Birth</Label>
+          <Label>Date of Birth / जन्म तारीख</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -429,7 +438,7 @@ const FamilyForm = () => {
                     (Age: {calculateAge(child.dateOfBirth)})
                   </>
                 ) : (
-                  <span>Pick a date</span>
+                  <span>Pick a date / तारीख निवडा</span>
                 )}
               </Button>
             </PopoverTrigger>
@@ -451,97 +460,97 @@ const FamilyForm = () => {
         </div>
 
         <div>
-          <Label>Occupation</Label>
+          <Label>Occupation / व्यवसाय</Label>
           <Select onValueChange={(value) => updateChild(type, index, 'occupation', value)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select occupation" />
+              <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="salaried">Salaried</SelectItem>
-              <SelectItem value="business">Business</SelectItem>
-              <SelectItem value="student">Student</SelectItem>
-              <SelectItem value="unemployed">Unemployed</SelectItem>
+              <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
+              <SelectItem value="business">Business / व्यवसाय</SelectItem>
+              <SelectItem value="student">Student / विद्यार्थी</SelectItem>
+              <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <Label>Current Place</Label>
+          <Label>Current Place / सध्याचे ठिकाण</Label>
           <Input
-            placeholder="Enter current place"
+            placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
             value={child.currentPlace}
             onChange={(e) => updateChild(type, index, 'currentPlace', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Phone Number</Label>
+          <Label>Phone Number / फोन नंबर</Label>
           <Input
-            placeholder="Enter phone number"
+            placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
             value={child.phoneNumber}
             onChange={(e) => updateChild(type, index, 'phoneNumber', e.target.value)}
           />
         </div>
 
         <div>
-          <Label>Marital Status</Label>
+          <Label>Marital Status / वैवाहिक स्थिती</Label>
           <Select onValueChange={(value) => updateChild(type, index, 'maritalStatus', value)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select marital status" />
+              <SelectValue placeholder="Select marital status / वैवाहिक स्थिती निवडा" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="single">Single</SelectItem>
-              <SelectItem value="married">Married</SelectItem>
-              <SelectItem value="divorced">Divorced</SelectItem>
-              <SelectItem value="widowed">Widowed</SelectItem>
+              <SelectItem value="single">Single / अविवाहित</SelectItem>
+              <SelectItem value="married">Married / विवाहित</SelectItem>
+              <SelectItem value="divorced">Divorced / घटस्फोटित</SelectItem>
+              <SelectItem value="widowed">Widowed / विधवा</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       {/* Spouse section for married children */}
-      {child.maritalStatus === 'married' && child.spouse && (
+      {child.maritalStatus === 'MARRIED' && child.spouse && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-4">
           <h4 className="text-md font-semibold text-blue-700 mb-3">{type === 'son' ? 'Wife' : 'Husband'} Information</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>First Name</Label>
+              <Label>First Name / पहिले नाव</Label>
               <Input
-                placeholder="Enter first name"
+                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
                 value={child.spouse.firstName}
                 onChange={(e) => updateChildSpouse(type, index, 'firstName', e.target.value)}
               />
             </div>
             
             <div>
-              <Label>Last Name</Label>
+              <Label>Last Name / आडनाव</Label>
               <Input
-                placeholder="Enter last name"
+                placeholder="Enter last name / आडनाव प्रविष्ट करा"
                 value={child.spouse.lastName}
                 onChange={(e) => updateChildSpouse(type, index, 'lastName', e.target.value)}
               />
             </div>
 
             <div>
-              <Label>Contact Number</Label>
+              <Label>Contact Number / संपर्क क्रमांक</Label>
               <Input
-                placeholder="Enter contact number"
+                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
                 value={child.spouse.contactNumber}
                 onChange={(e) => updateChildSpouse(type, index, 'contactNumber', e.target.value)}
               />
             </div>
 
             <div>
-              <Label>Native Place</Label>
+              <Label>Native Place / मूळ गाव</Label>
               <Input
-                placeholder="Enter native place"
+                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
                 value={child.spouse.nativePlace}
                 onChange={(e) => updateChildSpouse(type, index, 'nativePlace', e.target.value)}
               />
             </div>
 
             <div>
-              <Label>Date of Birth</Label>
+              <Label>Date of Birth / जन्म तारीख</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -555,7 +564,7 @@ const FamilyForm = () => {
                         (Age: {calculateAge(child.spouse.dateOfBirth)})
                       </>
                     ) : (
-                      <span>Pick a date</span>
+                      <span>Pick a date / तारीख निवडा</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -577,25 +586,25 @@ const FamilyForm = () => {
             </div>
 
             <div>
-              <Label>Occupation</Label>
+              <Label>Occupation / व्यवसाय</Label>
               <Select onValueChange={(value) => updateChildSpouse(type, index, 'occupation', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select occupation" />
+                  <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="retired">Retired</SelectItem>
-                  <SelectItem value="housewife">Housewife</SelectItem>
-                  <SelectItem value="salaried">Salaried</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="retired">Retired / निवृत्त</SelectItem>
+                  <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
+                  <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
+                  <SelectItem value="business">Business / व्यवसाय</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>Number of Children</Label>
+              <Label>Number of Children / मुलांची संख्या</Label>
               <Select onValueChange={(value) => updateChildSpouse(type, index, 'numberOfChildren', parseInt(value))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select number of children" />
+                  <SelectValue placeholder="Select number of children / मुलांची संख्या निवडा" />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 11 }, (_, i) => (
@@ -609,7 +618,7 @@ const FamilyForm = () => {
           {/* Grandchildren section */}
           {child.spouse.numberOfChildren > 0 && child.spouse.grandchildren && (
             <div className="mt-4 space-y-4">
-              <h5 className="text-lg font-semibold text-orange-700">Grandchildren</h5>
+              <h5 className="text-lg font-semibold text-orange-700">Grandchildren / नातवंडे</h5>
               {child.spouse.grandchildren.map((grandchild, grandchildIndex) => 
                 renderGrandchildForm(grandchild, index, grandchildIndex, type)
               )}
@@ -644,11 +653,6 @@ const FamilyForm = () => {
         <CardHeader>
           <CardTitle className="text-2xl text-blue-800">
             Family Head Information / कुटुंब प्रमुख माहिती
-            {getDisplayName(familyHeadFirstName, familyHeadLastName) && (
-              <span className="text-lg text-gray-600 ml-3">
-                ({getDisplayName(familyHeadFirstName, familyHeadLastName)} / {getMarathiTranslation(getDisplayName(familyHeadFirstName, familyHeadLastName))})
-              </span>
-            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -659,6 +663,11 @@ const FamilyForm = () => {
                 id="head-firstName"
                 {...familyHeadForm.register('firstName')}
                 placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                onChange={(e) => {
+                  const upperValue = e.target.value.toUpperCase();
+                  familyHeadForm.setValue('firstName', upperValue);
+                  e.target.value = upperValue;
+                }}
               />
               {familyHeadForm.formState.errors.firstName && (
                 <p className="text-red-500 text-sm mt-1">{familyHeadForm.formState.errors.firstName.message}</p>
@@ -671,6 +680,11 @@ const FamilyForm = () => {
                 id="head-lastName"
                 {...familyHeadForm.register('lastName')}
                 placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                onChange={(e) => {
+                  const upperValue = e.target.value.toUpperCase();
+                  familyHeadForm.setValue('lastName', upperValue);
+                  e.target.value = upperValue;
+                }}
               />
               {familyHeadForm.formState.errors.lastName && (
                 <p className="text-red-500 text-sm mt-1">{familyHeadForm.formState.errors.lastName.message}</p>
@@ -718,6 +732,11 @@ const FamilyForm = () => {
                 id="head-nativePlace"
                 {...familyHeadForm.register('nativePlace')}
                 placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+                onChange={(e) => {
+                  const upperValue = e.target.value.toUpperCase();
+                  familyHeadForm.setValue('nativePlace', upperValue);
+                  e.target.value = upperValue;
+                }}
               />
             </div>
 
@@ -727,6 +746,11 @@ const FamilyForm = () => {
                 id="head-currentPlace"
                 {...familyHeadForm.register('currentPlace')}
                 placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+                onChange={(e) => {
+                  const upperValue = e.target.value.toUpperCase();
+                  familyHeadForm.setValue('currentPlace', upperValue);
+                  e.target.value = upperValue;
+                }}
               />
             </div>
 
@@ -782,7 +806,7 @@ const FamilyForm = () => {
               Spouse Information / जोडीदार माहिती
               {getDisplayName(spouseFirstName, spouseLastName) && (
                 <span className="text-lg text-gray-600 ml-3">
-                  ({getDisplayName(spouseFirstName, spouseLastName)} / {getMarathiTranslation(getDisplayName(spouseFirstName, spouseLastName))})
+                  ({getDisplayName(spouseFirstName, spouseLastName)})
                 </span>
               )}
             </CardTitle>
@@ -795,6 +819,11 @@ const FamilyForm = () => {
                   id="spouse-firstName"
                   {...spouseForm.register('firstName')}
                   placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                  onChange={(e) => {
+                    const upperValue = e.target.value.toUpperCase();
+                    spouseForm.setValue('firstName', upperValue);
+                    e.target.value = upperValue;
+                  }}
                 />
               </div>
               
@@ -804,6 +833,11 @@ const FamilyForm = () => {
                   id="spouse-lastName"
                   {...spouseForm.register('lastName')}
                   placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                  onChange={(e) => {
+                    const upperValue = e.target.value.toUpperCase();
+                    spouseForm.setValue('lastName', upperValue);
+                    e.target.value = upperValue;
+                  }}
                 />
               </div>
 
@@ -825,6 +859,11 @@ const FamilyForm = () => {
                   id="spouse-nativePlace"
                   {...spouseForm.register('nativePlace')}
                   placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+                  onChange={(e) => {
+                    const upperValue = e.target.value.toUpperCase();
+                    spouseForm.setValue('nativePlace', upperValue);
+                    e.target.value = upperValue;
+                  }}
                 />
               </div>
 
