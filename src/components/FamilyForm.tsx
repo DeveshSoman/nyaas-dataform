@@ -95,6 +95,12 @@ const FamilyForm = () => {
     resolver: zodResolver(spouseSchema),
   });
 
+  // Watch form values for display
+  const familyHeadFirstName = familyHeadForm.watch('firstName') || '';
+  const familyHeadLastName = familyHeadForm.watch('lastName') || '';
+  const spouseFirstName = spouseForm.watch('firstName') || '';
+  const spouseLastName = spouseForm.watch('lastName') || '';
+
   const handleMaritalStatusChange = (value: string) => {
     familyHeadForm.setValue('maritalStatus', value as any);
     setShowSpouse(value === 'married');
@@ -614,21 +620,45 @@ const FamilyForm = () => {
     </div>
   );
 
+  const getDisplayName = (firstName: string, lastName: string) => {
+    if (!firstName && !lastName) return '';
+    return `${firstName} ${lastName}`.trim();
+  };
+
+  const getMarathiTranslation = (name: string) => {
+    // Simple transliteration mapping - in a real app, you'd use a proper translation API
+    const translationMap: { [key: string]: string } = {
+      'a': 'अ', 'b': 'ब', 'c': 'च', 'd': 'द', 'e': 'ए', 'f': 'फ', 'g': 'ग', 'h': 'ह',
+      'i': 'इ', 'j': 'ज', 'k': 'क', 'l': 'ल', 'm': 'म', 'n': 'न', 'o': 'ओ', 'p': 'प',
+      'q': 'क्यू', 'r': 'र', 's': 'स', 't': 'त', 'u': 'उ', 'v': 'व', 'w': 'व', 'x': 'क्स',
+      'y': 'य', 'z': 'झ', ' ': ' '
+    };
+    
+    return name.toLowerCase().split('').map(char => translationMap[char] || char).join('');
+  };
+
   return (
     <div className="space-y-6">
       {/* Family Head Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl text-blue-800">Family Head Information</CardTitle>
+          <CardTitle className="text-2xl text-blue-800">
+            Family Head Information / कुटुंब प्रमुख माहिती
+            {getDisplayName(familyHeadFirstName, familyHeadLastName) && (
+              <span className="text-lg text-gray-600 ml-3">
+                ({getDisplayName(familyHeadFirstName, familyHeadLastName)} / {getMarathiTranslation(getDisplayName(familyHeadFirstName, familyHeadLastName))})
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="head-firstName">First Name</Label>
+              <Label htmlFor="head-firstName">First Name / पहिले नाव</Label>
               <Input
                 id="head-firstName"
                 {...familyHeadForm.register('firstName')}
-                placeholder="Enter first name"
+                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
               />
               {familyHeadForm.formState.errors.firstName && (
                 <p className="text-red-500 text-sm mt-1">{familyHeadForm.formState.errors.firstName.message}</p>
@@ -636,11 +666,11 @@ const FamilyForm = () => {
             </div>
             
             <div>
-              <Label htmlFor="head-lastName">Last Name</Label>
+              <Label htmlFor="head-lastName">Last Name / आडनाव</Label>
               <Input
                 id="head-lastName"
                 {...familyHeadForm.register('lastName')}
-                placeholder="Enter last name"
+                placeholder="Enter last name / आडनाव प्रविष्ट करा"
               />
               {familyHeadForm.formState.errors.lastName && (
                 <p className="text-red-500 text-sm mt-1">{familyHeadForm.formState.errors.lastName.message}</p>
@@ -648,7 +678,7 @@ const FamilyForm = () => {
             </div>
 
             <div>
-              <Label>Date of Birth</Label>
+              <Label>Date of Birth / जन्म तारीख</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -665,7 +695,7 @@ const FamilyForm = () => {
                         (Age: {calculateAge(familyHeadForm.watch('dateOfBirth'))})
                       </>
                     ) : (
-                      <span>Pick a date</span>
+                      <span>Pick a date / तारीख निवडा</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -683,29 +713,29 @@ const FamilyForm = () => {
             </div>
 
             <div>
-              <Label htmlFor="head-nativePlace">Native Place</Label>
+              <Label htmlFor="head-nativePlace">Native Place / मूळ गाव</Label>
               <Input
                 id="head-nativePlace"
                 {...familyHeadForm.register('nativePlace')}
-                placeholder="Enter native place"
+                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
               />
             </div>
 
             <div>
-              <Label htmlFor="head-currentPlace">Current Place</Label>
+              <Label htmlFor="head-currentPlace">Current Place / सध्याचे ठिकाण</Label>
               <Input
                 id="head-currentPlace"
                 {...familyHeadForm.register('currentPlace')}
-                placeholder="Enter current place"
+                placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
               />
             </div>
 
             <div>
-              <Label htmlFor="head-contactNumber">Contact Number</Label>
+              <Label htmlFor="head-contactNumber">Contact Number / संपर्क क्रमांक</Label>
               <Input
                 id="head-contactNumber"
                 {...familyHeadForm.register('contactNumber')}
-                placeholder="Enter contact number"
+                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
               />
               {familyHeadForm.formState.errors.contactNumber && (
                 <p className="text-red-500 text-sm mt-1">{familyHeadForm.formState.errors.contactNumber.message}</p>
@@ -713,30 +743,30 @@ const FamilyForm = () => {
             </div>
 
             <div>
-              <Label>Marital Status</Label>
+              <Label>Marital Status / वैवाहिक स्थिती</Label>
               <Select onValueChange={handleMaritalStatusChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select marital status" />
+                  <SelectValue placeholder="Select marital status / वैवाहिक स्थिती निवडा" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="single">Single</SelectItem>
-                  <SelectItem value="married">Married</SelectItem>
-                  <SelectItem value="divorced">Divorced</SelectItem>
-                  <SelectItem value="widowed">Widowed</SelectItem>
+                  <SelectItem value="single">Single / अविवाहित</SelectItem>
+                  <SelectItem value="married">Married / विवाहित</SelectItem>
+                  <SelectItem value="divorced">Divorced / घटस्फोटित</SelectItem>
+                  <SelectItem value="widowed">Widowed / विधवा</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>Occupation</Label>
+              <Label>Occupation / व्यवसाय</Label>
               <Select onValueChange={(value) => familyHeadForm.setValue('occupation', value as any)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select occupation" />
+                  <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="retired">Retired</SelectItem>
-                  <SelectItem value="salaried">Salaried</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="retired">Retired / निवृत्त</SelectItem>
+                  <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
+                  <SelectItem value="business">Business / व्यवसाय</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -748,34 +778,41 @@ const FamilyForm = () => {
       {showSpouse && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-green-800">Spouse Information</CardTitle>
+            <CardTitle className="text-2xl text-green-800">
+              Spouse Information / जोडीदार माहिती
+              {getDisplayName(spouseFirstName, spouseLastName) && (
+                <span className="text-lg text-gray-600 ml-3">
+                  ({getDisplayName(spouseFirstName, spouseLastName)} / {getMarathiTranslation(getDisplayName(spouseFirstName, spouseLastName))})
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="spouse-firstName">First Name</Label>
+                <Label htmlFor="spouse-firstName">First Name / पहिले नाव</Label>
                 <Input
                   id="spouse-firstName"
                   {...spouseForm.register('firstName')}
-                  placeholder="Enter first name"
+                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
                 />
               </div>
               
               <div>
-                <Label htmlFor="spouse-lastName">Last Name</Label>
+                <Label htmlFor="spouse-lastName">Last Name / आडनाव</Label>
                 <Input
                   id="spouse-lastName"
                   {...spouseForm.register('lastName')}
-                  placeholder="Enter last name"
+                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
                 />
               </div>
 
               <div>
-                <Label htmlFor="spouse-contactNumber">Contact Number (Required)</Label>
+                <Label htmlFor="spouse-contactNumber">Contact Number / संपर्क क्रमांक</Label>
                 <Input
                   id="spouse-contactNumber"
                   {...spouseForm.register('contactNumber')}
-                  placeholder="Enter contact number"
+                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
                 />
                 {spouseForm.formState.errors.contactNumber && (
                   <p className="text-red-500 text-sm mt-1">{spouseForm.formState.errors.contactNumber.message}</p>
@@ -783,16 +820,16 @@ const FamilyForm = () => {
               </div>
 
               <div>
-                <Label htmlFor="spouse-nativePlace">Native Place</Label>
+                <Label htmlFor="spouse-nativePlace">Native Place / मूळ गाव</Label>
                 <Input
                   id="spouse-nativePlace"
                   {...spouseForm.register('nativePlace')}
-                  placeholder="Enter native place"
+                  placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
                 />
               </div>
 
               <div>
-                <Label>Date of Birth</Label>
+                <Label>Date of Birth / जन्म तारीख</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -809,7 +846,7 @@ const FamilyForm = () => {
                           (Age: {calculateAge(spouseForm.watch('dateOfBirth'))})
                         </>
                       ) : (
-                        <span>Pick a date</span>
+                        <span>Pick a date / तारीख निवडा</span>
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -827,25 +864,25 @@ const FamilyForm = () => {
               </div>
 
               <div>
-                <Label>Occupation</Label>
+                <Label>Occupation / व्यवसाय</Label>
                 <Select onValueChange={(value) => spouseForm.setValue('occupation', value as any)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select occupation" />
+                    <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="retired">Retired</SelectItem>
-                    <SelectItem value="housewife">Housewife</SelectItem>
-                    <SelectItem value="salaried">Salaried</SelectItem>
-                    <SelectItem value="business">Business</SelectItem>
+                    <SelectItem value="retired">Retired / निवृत्त</SelectItem>
+                    <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
+                    <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
+                    <SelectItem value="business">Business / व्यवसाय</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label>Number of Sons</Label>
+                <Label>Number of Sons / मुलांची संख्या</Label>
                 <Select onValueChange={(value) => handleNumberOfSonsChange(parseInt(value))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select number of sons" />
+                    <SelectValue placeholder="Select number of sons / मुलांची संख्या निवडा" />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: 11 }, (_, i) => (
@@ -856,10 +893,10 @@ const FamilyForm = () => {
               </div>
 
               <div>
-                <Label>Number of Daughters</Label>
+                <Label>Number of Daughters / मुलींची संख्या</Label>
                 <Select onValueChange={(value) => handleNumberOfDaughtersChange(parseInt(value))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select number of daughters" />
+                    <SelectValue placeholder="Select number of daughters / मुलींची संख्या निवडा" />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: 11 }, (_, i) => (
@@ -877,7 +914,7 @@ const FamilyForm = () => {
       {numberOfSons > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-purple-800">Sons Information</CardTitle>
+            <CardTitle className="text-2xl text-purple-800">Sons Information / मुलांची माहिती</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {sons.map((son, index) => renderChildForm(son, index, 'son'))}
@@ -889,7 +926,7 @@ const FamilyForm = () => {
       {numberOfDaughters > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-pink-800">Daughters Information</CardTitle>
+            <CardTitle className="text-2xl text-pink-800">Daughters Information / मुलींची माहिती</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {daughters.map((daughter, index) => renderChildForm(daughter, index, 'daughter'))}
@@ -903,7 +940,7 @@ const FamilyForm = () => {
           onClick={onSubmit}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
         >
-          Submit Family Information
+          Submit Family Information / कुटुंब माहिती सबमिट करा
         </Button>
       </div>
     </div>
