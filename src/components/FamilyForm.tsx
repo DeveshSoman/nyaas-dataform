@@ -65,13 +65,6 @@ const FamilyForm = () => {
     resolver: zodResolver(spouseSchema),
   });
 
-  const grandChildForms = grandChildren.map((_, index) => 
-    useForm<GrandChildData>({
-      resolver: zodResolver(grandChildSchema),
-      defaultValues: grandChildren[index] || {},
-    })
-  );
-
   const handleMaritalStatusChange = (value: string) => {
     familyHeadForm.setValue('maritalStatus', value as any);
     setShowSpouse(value === 'married');
@@ -92,6 +85,12 @@ const FamilyForm = () => {
       phoneNumber: '',
     }));
     setGrandChildren(newGrandChildren);
+  };
+
+  const updateGrandChild = (index: number, field: keyof GrandChildData, value: any) => {
+    const newChildren = [...grandChildren];
+    newChildren[index] = { ...newChildren[index], [field]: value };
+    setGrandChildren(newChildren);
   };
 
   const onSubmit = () => {
@@ -390,11 +389,8 @@ const FamilyForm = () => {
                     <Label>First Name</Label>
                     <Input
                       placeholder="Enter first name"
-                      onChange={(e) => {
-                        const newChildren = [...grandChildren];
-                        newChildren[index] = { ...newChildren[index], firstName: e.target.value };
-                        setGrandChildren(newChildren);
-                      }}
+                      value={grandChildren[index]?.firstName || ''}
+                      onChange={(e) => updateGrandChild(index, 'firstName', e.target.value)}
                     />
                   </div>
                   
@@ -402,11 +398,8 @@ const FamilyForm = () => {
                     <Label>Last Name</Label>
                     <Input
                       placeholder="Enter last name"
-                      onChange={(e) => {
-                        const newChildren = [...grandChildren];
-                        newChildren[index] = { ...newChildren[index], lastName: e.target.value };
-                        setGrandChildren(newChildren);
-                      }}
+                      value={grandChildren[index]?.lastName || ''}
+                      onChange={(e) => updateGrandChild(index, 'lastName', e.target.value)}
                     />
                   </div>
 
@@ -414,11 +407,8 @@ const FamilyForm = () => {
                     <Label>Contact Number</Label>
                     <Input
                       placeholder="Enter contact number"
-                      onChange={(e) => {
-                        const newChildren = [...grandChildren];
-                        newChildren[index] = { ...newChildren[index], contactNumber: e.target.value };
-                        setGrandChildren(newChildren);
-                      }}
+                      value={grandChildren[index]?.contactNumber || ''}
+                      onChange={(e) => updateGrandChild(index, 'contactNumber', e.target.value)}
                     />
                   </div>
 
@@ -447,9 +437,7 @@ const FamilyForm = () => {
                           selected={grandChildren[index]?.dateOfBirth}
                           onSelect={(date) => {
                             if (date) {
-                              const newChildren = [...grandChildren];
-                              newChildren[index] = { ...newChildren[index], dateOfBirth: date };
-                              setGrandChildren(newChildren);
+                              updateGrandChild(index, 'dateOfBirth', date);
                             }
                           }}
                           disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
@@ -462,11 +450,7 @@ const FamilyForm = () => {
 
                   <div>
                     <Label>Occupation</Label>
-                    <Select onValueChange={(value) => {
-                      const newChildren = [...grandChildren];
-                      newChildren[index] = { ...newChildren[index], occupation: value as any };
-                      setGrandChildren(newChildren);
-                    }}>
+                    <Select onValueChange={(value) => updateGrandChild(index, 'occupation', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select occupation" />
                       </SelectTrigger>
@@ -483,11 +467,8 @@ const FamilyForm = () => {
                     <Label>Current Place</Label>
                     <Input
                       placeholder="Enter current place"
-                      onChange={(e) => {
-                        const newChildren = [...grandChildren];
-                        newChildren[index] = { ...newChildren[index], currentPlace: e.target.value };
-                        setGrandChildren(newChildren);
-                      }}
+                      value={grandChildren[index]?.currentPlace || ''}
+                      onChange={(e) => updateGrandChild(index, 'currentPlace', e.target.value)}
                     />
                   </div>
 
@@ -495,11 +476,8 @@ const FamilyForm = () => {
                     <Label>Phone Number</Label>
                     <Input
                       placeholder="Enter phone number"
-                      onChange={(e) => {
-                        const newChildren = [...grandChildren];
-                        newChildren[index] = { ...newChildren[index], phoneNumber: e.target.value };
-                        setGrandChildren(newChildren);
-                      }}
+                      value={grandChildren[index]?.phoneNumber || ''}
+                      onChange={(e) => updateGrandChild(index, 'phoneNumber', e.target.value)}
                     />
                   </div>
                 </div>
