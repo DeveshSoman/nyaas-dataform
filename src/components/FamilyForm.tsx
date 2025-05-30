@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,12 +32,12 @@ const spouseSchema = z.object({
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
   nativePlace: z.string().min(1, 'Native place is required'),
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
-  maritalStatus: z.enum(['single', 'married', 'divorced', 'widowed']),
   occupation: z.enum(['retired', 'housewife', 'salaried', 'business']),
-  numberOfChildren: z.number().min(0).max(20),
+  numberOfSons: z.number().min(0).max(20),
+  numberOfDaughters: z.number().min(0).max(20),
 });
 
-const grandChildSchema = z.object({
+const childSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
@@ -46,16 +45,33 @@ const grandChildSchema = z.object({
   occupation: z.enum(['salaried', 'business', 'student', 'unemployed']),
   currentPlace: z.string().min(1, 'Current place is required'),
   phoneNumber: z.string().regex(/^\d+$/, 'Phone number must contain only numbers'),
+  maritalStatus: z.enum(['single', 'married', 'divorced', 'widowed']),
+});
+
+const childSpouseSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
+  nativePlace: z.string().min(1, 'Native place is required'),
+  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  occupation: z.enum(['retired', 'housewife', 'salaried', 'business']),
 });
 
 type FamilyHeadData = z.infer<typeof familyHeadSchema>;
 type SpouseData = z.infer<typeof spouseSchema>;
-type GrandChildData = z.infer<typeof grandChildSchema>;
+type ChildData = z.infer<typeof childSchema>;
+type ChildSpouseData = z.infer<typeof childSpouseSchema>;
+
+interface ChildWithSpouse extends ChildData {
+  spouse?: ChildSpouseData;
+}
 
 const FamilyForm = () => {
   const [showSpouse, setShowSpouse] = useState(false);
-  const [numberOfChildren, setNumberOfChildren] = useState(0);
-  const [grandChildren, setGrandChildren] = useState<GrandChildData[]>([]);
+  const [numberOfSons, setNumberOfSons] = useState(0);
+  const [numberOfDaughters, setNumberOfDaughters] = useState(0);
+  const [sons, setSons] = useState<ChildWithSpouse[]>([]);
+  const [daughters, setDaughters] = useState<ChildWithSpouse[]>([]);
 
   const familyHeadForm = useForm<FamilyHeadData>({
     resolver: zodResolver(familyHeadSchema),
@@ -70,12 +86,11 @@ const FamilyForm = () => {
     setShowSpouse(value === 'married');
   };
 
-  const handleNumberOfChildrenChange = (value: number) => {
-    setNumberOfChildren(value);
-    spouseForm.setValue('numberOfChildren', value);
+  const handleNumberOfSonsChange = (value: number) => {
+    setNumberOfSons(value);
+    spouseForm.setValue('numberOfSons', value);
     
-    // Initialize grandchildren array
-    const newGrandChildren = Array(value).fill(null).map(() => ({
+    const newSons = Array(value).fill(null).map(() => ({
       firstName: '',
       lastName: '',
       contactNumber: '',
@@ -83,14 +98,88 @@ const FamilyForm = () => {
       occupation: 'student' as const,
       currentPlace: '',
       phoneNumber: '',
+      maritalStatus: 'single' as const,
     }));
-    setGrandChildren(newGrandChildren);
+    setSons(newSons);
   };
 
-  const updateGrandChild = (index: number, field: keyof GrandChildData, value: any) => {
-    const newChildren = [...grandChildren];
-    newChildren[index] = { ...newChildren[index], [field]: value };
-    setGrandChildren(newChildren);
+  const handleNumberOfDaughtersChange = (value: number) => {
+    setNumberOfDaughters(value);
+    spouseForm.setValue('numberOfDaughters', value);
+    
+    const newDaughters = Array(value).fill(null).map(() => ({
+      firstName: '',
+      lastName: '',
+      contactNumber: '',
+      dateOfBirth: new Date(),
+      occupation: 'student' as const,
+      currentPlace: '',
+      phoneNumber: '',
+      maritalStatus: 'single' as const,
+    }));
+    setDaughters(newDaughters);
+  };
+
+  const updateChild = (type: 'son' | 'daughter', index: number, field: keyof ChildData, value: any) => {
+    if (type === 'son') {
+      const newSons = [...sons];
+      newSons[index] = { ...newSons[index], [field]: value };
+      
+      // If marital status changes to married, initialize spouse; if not married, remove spouse
+      if (field === 'maritalStatus') {
+        if (value === 'married') {
+          newSons[index].spouse = {
+            firstName: '',
+            lastName: '',
+            contactNumber: '',
+            nativePlace: '',
+            dateOfBirth: new Date(),
+            occupation: 'housewife',
+          };
+        } else {
+          delete newSons[index].spouse;
+        }
+      }
+      
+      setSons(newSons);
+    } else {
+      const newDaughters = [...daughters];
+      newDaughters[index] = { ...newDaughters[index], [field]: value };
+      
+      // If marital status changes to married, initialize spouse; if not married, remove spouse
+      if (field === 'maritalStatus') {
+        if (value === 'married') {
+          newDaughters[index].spouse = {
+            firstName: '',
+            lastName: '',
+            contactNumber: '',
+            nativePlace: '',
+            dateOfBirth: new Date(),
+            occupation: 'salaried',
+          };
+        } else {
+          delete newDaughters[index].spouse;
+        }
+      }
+      
+      setDaughters(newDaughters);
+    }
+  };
+
+  const updateChildSpouse = (type: 'son' | 'daughter', index: number, field: keyof ChildSpouseData, value: any) => {
+    if (type === 'son') {
+      const newSons = [...sons];
+      if (newSons[index].spouse) {
+        newSons[index].spouse = { ...newSons[index].spouse!, [field]: value };
+        setSons(newSons);
+      }
+    } else {
+      const newDaughters = [...daughters];
+      if (newDaughters[index].spouse) {
+        newDaughters[index].spouse = { ...newDaughters[index].spouse!, [field]: value };
+        setDaughters(newDaughters);
+      }
+    }
   };
 
   const onSubmit = () => {
@@ -104,7 +193,8 @@ const FamilyForm = () => {
         
         console.log('Family Head Data:', familyHeadData);
         console.log('Spouse Data:', spouseData);
-        console.log('Grand Children Data:', grandChildren);
+        console.log('Sons Data:', sons);
+        console.log('Daughters Data:', daughters);
         
         toast({
           title: "Form Submitted Successfully!",
@@ -113,6 +203,219 @@ const FamilyForm = () => {
       }
     });
   };
+
+  const renderChildForm = (child: ChildWithSpouse, index: number, type: 'son' | 'daughter') => (
+    <div key={index} className="border rounded-lg p-4 bg-gray-50 space-y-4">
+      <h3 className="text-lg font-semibold text-purple-700 capitalize">{type} {index + 1}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label>First Name</Label>
+          <Input
+            placeholder="Enter first name"
+            value={child.firstName}
+            onChange={(e) => updateChild(type, index, 'firstName', e.target.value)}
+          />
+        </div>
+        
+        <div>
+          <Label>Last Name</Label>
+          <Input
+            placeholder="Enter last name"
+            value={child.lastName}
+            onChange={(e) => updateChild(type, index, 'lastName', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Contact Number</Label>
+          <Input
+            placeholder="Enter contact number"
+            value={child.contactNumber}
+            onChange={(e) => updateChild(type, index, 'contactNumber', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Date of Birth</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {child.dateOfBirth ? (
+                  <>
+                    {format(child.dateOfBirth, "PPP")} 
+                    (Age: {calculateAge(child.dateOfBirth)})
+                  </>
+                ) : (
+                  <span>Pick a date</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={child.dateOfBirth}
+                onSelect={(date) => {
+                  if (date) {
+                    updateChild(type, index, 'dateOfBirth', date);
+                  }
+                }}
+                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div>
+          <Label>Occupation</Label>
+          <Select onValueChange={(value) => updateChild(type, index, 'occupation', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select occupation" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="salaried">Salaried</SelectItem>
+              <SelectItem value="business">Business</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="unemployed">Unemployed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Current Place</Label>
+          <Input
+            placeholder="Enter current place"
+            value={child.currentPlace}
+            onChange={(e) => updateChild(type, index, 'currentPlace', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Phone Number</Label>
+          <Input
+            placeholder="Enter phone number"
+            value={child.phoneNumber}
+            onChange={(e) => updateChild(type, index, 'phoneNumber', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Marital Status</Label>
+          <Select onValueChange={(value) => updateChild(type, index, 'maritalStatus', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select marital status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="single">Single</SelectItem>
+              <SelectItem value="married">Married</SelectItem>
+              <SelectItem value="divorced">Divorced</SelectItem>
+              <SelectItem value="widowed">Widowed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Spouse section for married children */}
+      {child.maritalStatus === 'married' && child.spouse && (
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+          <h4 className="text-md font-semibold text-blue-700 mb-3">{type === 'son' ? 'Wife' : 'Husband'} Information</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>First Name</Label>
+              <Input
+                placeholder="Enter first name"
+                value={child.spouse.firstName}
+                onChange={(e) => updateChildSpouse(type, index, 'firstName', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <Label>Last Name</Label>
+              <Input
+                placeholder="Enter last name"
+                value={child.spouse.lastName}
+                onChange={(e) => updateChildSpouse(type, index, 'lastName', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Contact Number</Label>
+              <Input
+                placeholder="Enter contact number"
+                value={child.spouse.contactNumber}
+                onChange={(e) => updateChildSpouse(type, index, 'contactNumber', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Native Place</Label>
+              <Input
+                placeholder="Enter native place"
+                value={child.spouse.nativePlace}
+                onChange={(e) => updateChildSpouse(type, index, 'nativePlace', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Date of Birth</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {child.spouse.dateOfBirth ? (
+                      <>
+                        {format(child.spouse.dateOfBirth, "PPP")} 
+                        (Age: {calculateAge(child.spouse.dateOfBirth)})
+                      </>
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={child.spouse.dateOfBirth}
+                    onSelect={(date) => {
+                      if (date) {
+                        updateChildSpouse(type, index, 'dateOfBirth', date);
+                      }
+                    }}
+                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div>
+              <Label>Occupation</Label>
+              <Select onValueChange={(value) => updateChildSpouse(type, index, 'occupation', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select occupation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="retired">Retired</SelectItem>
+                  <SelectItem value="housewife">Housewife</SelectItem>
+                  <SelectItem value="salaried">Salaried</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -327,21 +630,6 @@ const FamilyForm = () => {
               </div>
 
               <div>
-                <Label>Marital Status</Label>
-                <Select onValueChange={(value) => spouseForm.setValue('maritalStatus', value as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select marital status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single">Single</SelectItem>
-                    <SelectItem value="married">Married</SelectItem>
-                    <SelectItem value="divorced">Divorced</SelectItem>
-                    <SelectItem value="widowed">Widowed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <Label>Occupation</Label>
                 <Select onValueChange={(value) => spouseForm.setValue('occupation', value as any)}>
                   <SelectTrigger>
@@ -357,10 +645,24 @@ const FamilyForm = () => {
               </div>
 
               <div>
-                <Label>Number of Children</Label>
-                <Select onValueChange={(value) => handleNumberOfChildrenChange(parseInt(value))}>
+                <Label>Number of Sons</Label>
+                <Select onValueChange={(value) => handleNumberOfSonsChange(parseInt(value))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select number of children" />
+                    <SelectValue placeholder="Select number of sons" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 11 }, (_, i) => (
+                      <SelectItem key={i} value={i.toString()}>{i}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Number of Daughters</Label>
+                <Select onValueChange={(value) => handleNumberOfDaughtersChange(parseInt(value))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select number of daughters" />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: 11 }, (_, i) => (
@@ -374,115 +676,26 @@ const FamilyForm = () => {
         </Card>
       )}
 
-      {/* Grand Children Section */}
-      {numberOfChildren > 0 && (
+      {/* Sons Section */}
+      {numberOfSons > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-purple-800">Children Information</CardTitle>
+            <CardTitle className="text-2xl text-purple-800">Sons Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {Array.from({ length: numberOfChildren }, (_, index) => (
-              <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                <h3 className="text-lg font-semibold mb-4 text-purple-700">Child {index + 1}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>First Name</Label>
-                    <Input
-                      placeholder="Enter first name"
-                      value={grandChildren[index]?.firstName || ''}
-                      onChange={(e) => updateGrandChild(index, 'firstName', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label>Last Name</Label>
-                    <Input
-                      placeholder="Enter last name"
-                      value={grandChildren[index]?.lastName || ''}
-                      onChange={(e) => updateGrandChild(index, 'lastName', e.target.value)}
-                    />
-                  </div>
+            {sons.map((son, index) => renderChildForm(son, index, 'son'))}
+          </CardContent>
+        </Card>
+      )}
 
-                  <div>
-                    <Label>Contact Number</Label>
-                    <Input
-                      placeholder="Enter contact number"
-                      value={grandChildren[index]?.contactNumber || ''}
-                      onChange={(e) => updateGrandChild(index, 'contactNumber', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {grandChildren[index]?.dateOfBirth ? (
-                            <>
-                              {format(grandChildren[index].dateOfBirth, "PPP")} 
-                              (Age: {calculateAge(grandChildren[index].dateOfBirth)})
-                            </>
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={grandChildren[index]?.dateOfBirth}
-                          onSelect={(date) => {
-                            if (date) {
-                              updateGrandChild(index, 'dateOfBirth', date);
-                            }
-                          }}
-                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div>
-                    <Label>Occupation</Label>
-                    <Select onValueChange={(value) => updateGrandChild(index, 'occupation', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select occupation" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="salaried">Salaried</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="unemployed">Unemployed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Current Place</Label>
-                    <Input
-                      placeholder="Enter current place"
-                      value={grandChildren[index]?.currentPlace || ''}
-                      onChange={(e) => updateGrandChild(index, 'currentPlace', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Phone Number</Label>
-                    <Input
-                      placeholder="Enter phone number"
-                      value={grandChildren[index]?.phoneNumber || ''}
-                      onChange={(e) => updateGrandChild(index, 'phoneNumber', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+      {/* Daughters Section */}
+      {numberOfDaughters > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl text-pink-800">Daughters Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {daughters.map((daughter, index) => renderChildForm(daughter, index, 'daughter'))}
           </CardContent>
         </Card>
       )}
