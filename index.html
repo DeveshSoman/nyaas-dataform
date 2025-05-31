@@ -1,26 +1,267 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>family-compass-form-builder</title>
-    <meta name="description" content="Lovable Generated Project" />
-    <meta name="author" content="Lovable" />
-
-    <meta property="og:title" content="family-compass-form-builder" />
-    <meta property="og:description" content="Lovable Generated Project" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <title>Family Information Form</title>
+    <meta name="description" content="Family Information Form" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
-
   <body>
-    <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
+      <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-8">
+          <h1 class="text-4xl font-bold text-gray-800 mb-2">Family Information Form</h1>
+          <p class="text-gray-600">Please fill out the details for your family members</p>
+        </div>
+        
+        <div id="familyForm" class="space-y-6">
+          <!-- Family Head Section -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title text-2xl text-blue-800" id="familyHeadTitle">
+                Family Head Information / कुटुंब प्रमुख माहिती
+              </h2>
+            </div>
+            <div class="card-content space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="label">First Name / पहिले नाव</label>
+                  <input
+                    type="text"
+                    id="headFirstName"
+                    class="input"
+                    placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                  />
+                  <div class="error-message" id="headFirstNameError"></div>
+                </div>
+                
+                <div>
+                  <label class="label">Last Name / आडनाव</label>
+                  <input
+                    type="text"
+                    id="headLastName"
+                    class="input"
+                    placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                  />
+                  <div class="error-message" id="headLastNameError"></div>
+                </div>
+
+                <div>
+                  <label class="label">Date of Birth / जन्म तारीख</label>
+                  <input
+                    type="date"
+                    id="headDateOfBirth"
+                    class="input"
+                  />
+                  <div class="age-display" id="headAge"></div>
+                </div>
+
+                <div>
+                  <label class="label">Native Place / मूळ गाव</label>
+                  <input
+                    type="text"
+                    id="headNativePlace"
+                    class="input"
+                    placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+                  />
+                </div>
+
+                <div>
+                  <label class="label">Current Place / सध्याचे ठिकाण</label>
+                  <input
+                    type="text"
+                    id="headCurrentPlace"
+                    class="input"
+                    placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+                  />
+                </div>
+
+                <div>
+                  <label class="label">Contact Number / संपर्क क्रमांक</label>
+                  <input
+                    type="text"
+                    id="headContactNumber"
+                    class="input"
+                    placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                  />
+                  <div class="error-message" id="headContactNumberError"></div>
+                </div>
+
+                <div>
+                  <label class="label">Marital Status / वैवाहिक स्थिती</label>
+                  <select id="headMaritalStatus" class="input">
+                    <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
+                    <option value="single">Single / अविवाहित</option>
+                    <option value="married">Married / विवाहित</option>
+                    <option value="divorced">Divorced / घटस्फोटित</option>
+                    <option value="widowed">Widowed / विधवा</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="label">Occupation / व्यवसाय</label>
+                  <select id="headOccupation" class="input">
+                    <option value="">Select occupation / व्यवसाय निवडा</option>
+                    <option value="retired">Retired / निवृत्त</option>
+                    <option value="salaried">Salaried / नोकरदार</option>
+                    <option value="business">Business / व्यवसाय</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Spouse Section -->
+          <div class="card" id="spouseSection" style="display: none;">
+            <div class="card-header">
+              <h2 class="card-title text-2xl text-green-800" id="spouseTitle">
+                Spouse Information / जोडीदार माहिती
+              </h2>
+            </div>
+            <div class="card-content space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="label">First Name / पहिले नाव</label>
+                  <input
+                    type="text"
+                    id="spouseFirstName"
+                    class="input"
+                    placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                  />
+                </div>
+                
+                <div>
+                  <label class="label">Last Name / आडनाव</label>
+                  <input
+                    type="text"
+                    id="spouseLastName"
+                    class="input"
+                    placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                  />
+                </div>
+
+                <div>
+                  <label class="label">Contact Number / संपर्क क्रमांक</label>
+                  <input
+                    type="text"
+                    id="spouseContactNumber"
+                    class="input"
+                    placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                  />
+                  <div class="error-message" id="spouseContactNumberError"></div>
+                </div>
+
+                <div>
+                  <label class="label">Native Place / मूळ गाव</label>
+                  <input
+                    type="text"
+                    id="spouseNativePlace"
+                    class="input"
+                    placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+                  />
+                </div>
+
+                <div>
+                  <label class="label">Date of Birth / जन्म तारीख</label>
+                  <input
+                    type="date"
+                    id="spouseDateOfBirth"
+                    class="input"
+                  />
+                  <div class="age-display" id="spouseAge"></div>
+                </div>
+
+                <div>
+                  <label class="label">Occupation / व्यवसाय</label>
+                  <select id="spouseOccupation" class="input">
+                    <option value="">Select occupation / व्यवसाय निवडा</option>
+                    <option value="retired">Retired / निवृत्त</option>
+                    <option value="housewife">Housewife / गृहिणी</option>
+                    <option value="salaried">Salaried / नोकरदार</option>
+                    <option value="business">Business / व्यवसाय</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="label">Number of Sons / मुलांची संख्या</label>
+                  <select id="numberOfSons" class="input">
+                    <option value="">Select number of sons / मुलांची संख्या निवडा</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="label">Number of Daughters / मुलींची संख्या</label>
+                  <select id="numberOfDaughters" class="input">
+                    <option value="">Select number of daughters / मुलींची संख्या निवडा</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sons Section -->
+          <div class="card" id="sonsSection" style="display: none;">
+            <div class="card-header">
+              <h2 class="card-title text-2xl text-purple-800">Sons Information / मुलांची माहिती</h2>
+            </div>
+            <div class="card-content space-y-6" id="sonsContainer">
+            </div>
+          </div>
+
+          <!-- Daughters Section -->
+          <div class="card" id="daughtersSection" style="display: none;">
+            <div class="card-header">
+              <h2 class="card-title text-2xl text-pink-800">Daughters Information / मुलींची माहिती</h2>
+            </div>
+            <div class="card-content space-y-6" id="daughtersContainer">
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="flex justify-center">
+            <button 
+              id="submitBtn"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg rounded-md transition-colors"
+            >
+              Submit Family Information / कुटुंब माहिती सबमिट करा
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast" class="toast" style="display: none;">
+      <div class="toast-content">
+        <h3 id="toastTitle"></h3>
+        <p id="toastMessage"></p>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
   </body>
 </html>
