@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,18 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { calculateAge } from '@/utils/ageCalculator';
 import { toast } from '@/hooks/use-toast';
 
 const familyHeadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  age: z.number(),
   nativePlace: z.string().min(1, 'Native place is required'),
   currentPlace: z.string().min(1, 'Current place is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
@@ -31,7 +28,8 @@ const spouseSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
   nativePlace: z.string().min(1, 'Native place is required'),
-  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  age: z.number(),
   occupation: z.enum(['retired', 'housewife', 'salaried', 'business']),
   numberOfSons: z.number().min(0).max(20),
   numberOfDaughters: z.number().min(0).max(20),
@@ -41,7 +39,8 @@ const childSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
-  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  age: z.number(),
   occupation: z.enum(['salaried', 'business', 'student', 'unemployed']),
   currentPlace: z.string().min(1, 'Current place is required'),
   phoneNumber: z.string().regex(/^\d+$/, 'Phone number must contain only numbers'),
@@ -53,7 +52,8 @@ const childSpouseSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
   nativePlace: z.string().min(1, 'Native place is required'),
-  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  age: z.number(),
   occupation: z.enum(['retired', 'housewife', 'salaried', 'business']),
   numberOfChildren: z.number().min(0).max(20),
 });
@@ -62,7 +62,8 @@ const grandchildSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   contactNumber: z.string().regex(/^\d+$/, 'Contact number must contain only numbers'),
-  dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  age: z.number(),
   occupation: z.enum(['salaried', 'business', 'student', 'unemployed']),
   currentPlace: z.string().min(1, 'Current place is required'),
   phoneNumber: z.string().regex(/^\d+$/, 'Phone number must contain only numbers'),
@@ -101,6 +102,13 @@ const FamilyForm = () => {
   const spouseFirstName = spouseForm.watch('firstName') || '';
   const spouseLastName = spouseForm.watch('lastName') || '';
 
+  const handleDateChange = (date: string, setValue: (field: string, value: any) => void) => {
+    if (date) {
+      const age = calculateAge(new Date(date));
+      setValue('age', age);
+    }
+  };
+
   const handleMaritalStatusChange = (value: string) => {
     familyHeadForm.setValue('maritalStatus', value as any);
     setShowSpouse(value === 'married');
@@ -114,7 +122,8 @@ const FamilyForm = () => {
       firstName: '',
       lastName: '',
       contactNumber: '',
-      dateOfBirth: new Date(),
+      dateOfBirth: '',
+      age: 0,
       occupation: 'student' as const,
       currentPlace: '',
       phoneNumber: '',
@@ -131,7 +140,8 @@ const FamilyForm = () => {
       firstName: '',
       lastName: '',
       contactNumber: '',
-      dateOfBirth: new Date(),
+      dateOfBirth: '',
+      age: 0,
       occupation: 'student' as const,
       currentPlace: '',
       phoneNumber: '',
@@ -148,6 +158,11 @@ const FamilyForm = () => {
       const newSons = [...sons];
       newSons[index] = { ...newSons[index], [field]: processedValue };
       
+      // Calculate age if dateOfBirth is updated
+      if (field === 'dateOfBirth' && processedValue) {
+        newSons[index].age = calculateAge(new Date(processedValue));
+      }
+      
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
         if (processedValue === 'married') {
@@ -156,7 +171,8 @@ const FamilyForm = () => {
             lastName: '',
             contactNumber: '',
             nativePlace: '',
-            dateOfBirth: new Date(),
+            dateOfBirth: '',
+            age: 0,
             occupation: 'housewife',
             numberOfChildren: 0,
             grandchildren: [],
@@ -171,6 +187,11 @@ const FamilyForm = () => {
       const newDaughters = [...daughters];
       newDaughters[index] = { ...newDaughters[index], [field]: processedValue };
       
+      // Calculate age if dateOfBirth is updated
+      if (field === 'dateOfBirth' && processedValue) {
+        newDaughters[index].age = calculateAge(new Date(processedValue));
+      }
+      
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
         if (processedValue === 'married') {
@@ -179,7 +200,8 @@ const FamilyForm = () => {
             lastName: '',
             contactNumber: '',
             nativePlace: '',
-            dateOfBirth: new Date(),
+            dateOfBirth: '',
+            age: 0,
             occupation: 'salaried',
             numberOfChildren: 0,
             grandchildren: [],
@@ -202,13 +224,19 @@ const FamilyForm = () => {
       if (newSons[index].spouse) {
         newSons[index].spouse = { ...newSons[index].spouse!, [field]: processedValue };
         
+        // Calculate age if dateOfBirth is updated
+        if (field === 'dateOfBirth' && processedValue) {
+          newSons[index].spouse!.age = calculateAge(new Date(processedValue));
+        }
+        
         // If numberOfChildren changes, update grandchildren array
         if (field === 'numberOfChildren') {
           const newGrandchildren = Array(processedValue).fill(null).map(() => ({
             firstName: '',
             lastName: '',
             contactNumber: '',
-            dateOfBirth: new Date(),
+            dateOfBirth: '',
+            age: 0,
             occupation: 'student' as const,
             currentPlace: '',
             phoneNumber: '',
@@ -223,13 +251,19 @@ const FamilyForm = () => {
       if (newDaughters[index].spouse) {
         newDaughters[index].spouse = { ...newDaughters[index].spouse!, [field]: processedValue };
         
+        // Calculate age if dateOfBirth is updated
+        if (field === 'dateOfBirth' && processedValue) {
+          newDaughters[index].spouse!.age = calculateAge(new Date(processedValue));
+        }
+        
         // If numberOfChildren changes, update grandchildren array
         if (field === 'numberOfChildren') {
           const newGrandchildren = Array(processedValue).fill(null).map(() => ({
             firstName: '',
             lastName: '',
             contactNumber: '',
-            dateOfBirth: new Date(),
+            dateOfBirth: '',
+            age: 0,
             occupation: 'student' as const,
             currentPlace: '',
             phoneNumber: '',
@@ -253,6 +287,12 @@ const FamilyForm = () => {
           ...newSons[childIndex].spouse!.grandchildren![grandchildIndex],
           [field]: processedValue
         };
+        
+        // Calculate age if dateOfBirth is updated
+        if (field === 'dateOfBirth' && processedValue) {
+          newSons[childIndex].spouse!.grandchildren![grandchildIndex].age = calculateAge(new Date(processedValue));
+        }
+        
         setSons(newSons);
       }
     } else {
@@ -262,6 +302,12 @@ const FamilyForm = () => {
           ...newDaughters[childIndex].spouse!.grandchildren![grandchildIndex],
           [field]: processedValue
         };
+        
+        // Calculate age if dateOfBirth is updated
+        if (field === 'dateOfBirth' && processedValue) {
+          newDaughters[childIndex].spouse!.grandchildren![grandchildIndex].age = calculateAge(new Date(processedValue));
+        }
+        
         setDaughters(newDaughters);
       }
     }
@@ -322,38 +368,14 @@ const FamilyForm = () => {
 
         <div>
           <Label>Date of Birth / जन्म तारीख</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {grandchild.dateOfBirth ? (
-                  <>
-                    {format(grandchild.dateOfBirth, "PPP")} 
-                    (Age: {calculateAge(grandchild.dateOfBirth)})
-                  </>
-                ) : (
-                  <span>Pick a date / तारीख निवडा</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={grandchild.dateOfBirth}
-                onSelect={(date) => {
-                  if (date) {
-                    updateGrandchild(childType, childIndex, grandchildIndex, 'dateOfBirth', date);
-                  }
-                }}
-                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+          <Input
+            type="date"
+            value={grandchild.dateOfBirth}
+            onChange={(e) => updateGrandchild(childType, childIndex, grandchildIndex, 'dateOfBirth', e.target.value)}
+          />
+          {grandchild.age > 0 && (
+            <div className="text-sm text-gray-600 mt-1">Age: {grandchild.age}</div>
+          )}
         </div>
 
         <div>
@@ -432,38 +454,14 @@ const FamilyForm = () => {
 
         <div>
           <Label>Date of Birth / जन्म तारीख</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {child.dateOfBirth ? (
-                  <>
-                    {format(child.dateOfBirth, "PPP")} 
-                    (Age: {calculateAge(child.dateOfBirth)})
-                  </>
-                ) : (
-                  <span>Pick a date / तारीख निवडा</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={child.dateOfBirth}
-                onSelect={(date) => {
-                  if (date) {
-                    updateChild(type, index, 'dateOfBirth', date);
-                  }
-                }}
-                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+          <Input
+            type="date"
+            value={child.dateOfBirth}
+            onChange={(e) => updateChild(type, index, 'dateOfBirth', e.target.value)}
+          />
+          {child.age > 0 && (
+            <div className="text-sm text-gray-600 mt-1">Age: {child.age}</div>
+          )}
         </div>
 
         <div>
@@ -565,38 +563,14 @@ const FamilyForm = () => {
 
             <div>
               <Label>Date of Birth / जन्म तारीख</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {child.spouse.dateOfBirth ? (
-                      <>
-                        {format(child.spouse.dateOfBirth, "PPP")} 
-                        (Age: {calculateAge(child.spouse.dateOfBirth)})
-                      </>
-                    ) : (
-                      <span>Pick a date / तारीख निवडा</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={child.spouse.dateOfBirth}
-                    onSelect={(date) => {
-                      if (date) {
-                        updateChildSpouse(type, index, 'dateOfBirth', date);
-                      }
-                    }}
-                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <Input
+                type="date"
+                value={child.spouse.dateOfBirth}
+                onChange={(e) => updateChildSpouse(type, index, 'dateOfBirth', e.target.value)}
+              />
+              {child.spouse.age > 0 && (
+                <div className="text-sm text-gray-600 mt-1">Age: {child.spouse.age}</div>
+              )}
             </div>
 
             <div>
@@ -700,37 +674,17 @@ const FamilyForm = () => {
 
             <div>
               <Label>Date of Birth / जन्म तारीख</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !familyHeadForm.watch('dateOfBirth') && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {familyHeadForm.watch('dateOfBirth') ? (
-                      <>
-                        {format(familyHeadForm.watch('dateOfBirth'), "PPP")} 
-                        (Age: {calculateAge(familyHeadForm.watch('dateOfBirth'))})
-                      </>
-                    ) : (
-                      <span>Pick a date / तारीख निवडा</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={familyHeadForm.watch('dateOfBirth')}
-                    onSelect={(date) => date && familyHeadForm.setValue('dateOfBirth', date)}
-                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <Input
+                type="date"
+                {...familyHeadForm.register('dateOfBirth')}
+                onChange={(e) => {
+                  familyHeadForm.setValue('dateOfBirth', e.target.value);
+                  handleDateChange(e.target.value, familyHeadForm.setValue);
+                }}
+              />
+              {familyHeadForm.watch('age') > 0 && (
+                <div className="text-sm text-gray-600 mt-1">Age: {familyHeadForm.watch('age')}</div>
+              )}
             </div>
 
             <div>
@@ -876,37 +830,17 @@ const FamilyForm = () => {
 
               <div>
                 <Label>Date of Birth / जन्म तारीख</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !spouseForm.watch('dateOfBirth') && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {spouseForm.watch('dateOfBirth') ? (
-                        <>
-                          {format(spouseForm.watch('dateOfBirth'), "PPP")} 
-                          (Age: {calculateAge(spouseForm.watch('dateOfBirth'))})
-                        </>
-                      ) : (
-                        <span>Pick a date / तारीख निवडा</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={spouseForm.watch('dateOfBirth')}
-                      onSelect={(date) => date && spouseForm.setValue('dateOfBirth', date)}
-                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  type="date"
+                  {...spouseForm.register('dateOfBirth')}
+                  onChange={(e) => {
+                    spouseForm.setValue('dateOfBirth', e.target.value);
+                    handleDateChange(e.target.value, spouseForm.setValue);
+                  }}
+                />
+                {spouseForm.watch('age') > 0 && (
+                  <div className="text-sm text-gray-600 mt-1">Age: {spouseForm.watch('age')}</div>
+                )}
               </div>
 
               <div>
