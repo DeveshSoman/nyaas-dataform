@@ -150,7 +150,7 @@ const FamilyForm = () => {
       
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
-        if (processedValue === 'MARRIED') {
+        if (processedValue === 'married') {
           newSons[index].spouse = {
             firstName: '',
             lastName: '',
@@ -173,7 +173,7 @@ const FamilyForm = () => {
       
       // If marital status changes to married, initialize spouse; if not married, remove spouse
       if (field === 'maritalStatus') {
-        if (processedValue === 'MARRIED') {
+        if (processedValue === 'married') {
           newDaughters[index].spouse = {
             firstName: '',
             lastName: '',
@@ -394,7 +394,14 @@ const FamilyForm = () => {
 
   const renderChildForm = (child: ChildWithSpouse, index: number, type: 'son' | 'daughter') => (
     <div key={index} className="border rounded-lg p-4 bg-gray-50 space-y-4">
-      <h3 className="text-lg font-semibold text-purple-700 capitalize">{type} {index + 1}</h3>
+      <h3 className="text-lg font-semibold text-purple-700 capitalize">
+        {type} {index + 1}
+        {child.firstName && child.lastName && (
+          <span className="text-lg text-gray-600 ml-3">
+            ({child.firstName} {child.lastName})
+          </span>
+        )}
+      </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label>First Name / पहिले नाव</Label>
@@ -509,9 +516,16 @@ const FamilyForm = () => {
       </div>
 
       {/* Spouse section for married children */}
-      {child.maritalStatus === 'MARRIED' && child.spouse && (
+      {child.maritalStatus === 'married' && child.spouse && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-4">
-          <h4 className="text-md font-semibold text-blue-700 mb-3">{type === 'son' ? 'Wife' : 'Husband'} Information</h4>
+          <h4 className="text-md font-semibold text-blue-700 mb-3">
+            {type === 'son' ? 'Wife' : 'Husband'} Information
+            {child.spouse.firstName && child.spouse.lastName && (
+              <span className="text-md text-gray-600 ml-3">
+                ({child.spouse.firstName} {child.spouse.lastName})
+              </span>
+            )}
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>First Name / पहिले नाव</Label>
@@ -634,18 +648,6 @@ const FamilyForm = () => {
     return `${firstName} ${lastName}`.trim();
   };
 
-  const getMarathiTranslation = (name: string) => {
-    // Simple transliteration mapping - in a real app, you'd use a proper translation API
-    const translationMap: { [key: string]: string } = {
-      'a': 'अ', 'b': 'ब', 'c': 'च', 'd': 'द', 'e': 'ए', 'f': 'फ', 'g': 'ग', 'h': 'ह',
-      'i': 'इ', 'j': 'ज', 'k': 'क', 'l': 'ल', 'm': 'म', 'n': 'न', 'o': 'ओ', 'p': 'प',
-      'q': 'क्यू', 'r': 'र', 's': 'स', 't': 'त', 'u': 'उ', 'v': 'व', 'w': 'व', 'x': 'क्स',
-      'y': 'य', 'z': 'झ', ' ': ' '
-    };
-    
-    return name.toLowerCase().split('').map(char => translationMap[char] || char).join('');
-  };
-
   return (
     <div className="space-y-6">
       {/* Family Head Section */}
@@ -653,6 +655,11 @@ const FamilyForm = () => {
         <CardHeader>
           <CardTitle className="text-2xl text-blue-800">
             Family Head Information / कुटुंब प्रमुख माहिती
+            {getDisplayName(familyHeadFirstName, familyHeadLastName) && (
+              <span className="text-lg text-gray-600 ml-3">
+                ({getDisplayName(familyHeadFirstName, familyHeadLastName)})
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
