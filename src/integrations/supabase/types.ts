@@ -9,7 +9,278 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      child_spouses: {
+        Row: {
+          age: number | null
+          child_id: string
+          contact_number: string | null
+          created_at: string
+          date_of_birth: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          native_place: string | null
+          number_of_children: number | null
+          occupation: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          child_id: string
+          contact_number?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          native_place?: string | null
+          number_of_children?: number | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          child_id?: string
+          contact_number?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          native_place?: string | null
+          number_of_children?: number | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "child_spouses_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      children: {
+        Row: {
+          age: number | null
+          child_index: number
+          child_type: string
+          contact_number: string | null
+          created_at: string
+          current_place: string | null
+          date_of_birth: string | null
+          family_head_id: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          marital_status: Database["public"]["Enums"]["marital_status"] | null
+          occupation: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          child_index: number
+          child_type: string
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth?: string | null
+          family_head_id: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          marital_status?: Database["public"]["Enums"]["marital_status"] | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          child_index?: number
+          child_type?: string
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth?: string | null
+          family_head_id?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          marital_status?: Database["public"]["Enums"]["marital_status"] | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "children_family_head_id_fkey"
+            columns: ["family_head_id"]
+            isOneToOne: false
+            referencedRelation: "family_heads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_heads: {
+        Row: {
+          age: number
+          contact_number: string | null
+          created_at: string
+          current_place: string | null
+          date_of_birth: string
+          first_name: string
+          id: string
+          last_name: string
+          marital_status: Database["public"]["Enums"]["marital_status"]
+          native_place: string | null
+          occupation: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at: string
+        }
+        Insert: {
+          age: number
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth: string
+          first_name: string
+          id?: string
+          last_name: string
+          marital_status: Database["public"]["Enums"]["marital_status"]
+          native_place?: string | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          marital_status?: Database["public"]["Enums"]["marital_status"]
+          native_place?: string | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      grandchildren: {
+        Row: {
+          age: number | null
+          child_spouse_id: string
+          contact_number: string | null
+          created_at: string
+          current_place: string | null
+          date_of_birth: string | null
+          first_name: string | null
+          grandchild_index: number
+          id: string
+          last_name: string | null
+          occupation: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          child_spouse_id: string
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          grandchild_index: number
+          id?: string
+          last_name?: string | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          child_spouse_id?: string
+          contact_number?: string | null
+          created_at?: string
+          current_place?: string | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          grandchild_index?: number
+          id?: string
+          last_name?: string | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grandchildren_child_spouse_id_fkey"
+            columns: ["child_spouse_id"]
+            isOneToOne: false
+            referencedRelation: "child_spouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spouses: {
+        Row: {
+          age: number | null
+          contact_number: string | null
+          created_at: string
+          date_of_birth: string | null
+          family_head_id: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          native_place: string | null
+          number_of_daughters: number | null
+          number_of_sons: number | null
+          occupation: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          contact_number?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          family_head_id: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          native_place?: string | null
+          number_of_daughters?: number | null
+          number_of_sons?: number | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          contact_number?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          family_head_id?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          native_place?: string | null
+          number_of_daughters?: number | null
+          number_of_sons?: number | null
+          occupation?: Database["public"]["Enums"]["occupation_type"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spouses_family_head_id_fkey"
+            columns: ["family_head_id"]
+            isOneToOne: false
+            referencedRelation: "family_heads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +289,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      marital_status: "single" | "married" | "divorced" | "widowed"
+      occupation_type:
+        | "retired"
+        | "housewife"
+        | "salaried"
+        | "business"
+        | "student"
+        | "unemployed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +411,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      marital_status: ["single", "married", "divorced", "widowed"],
+      occupation_type: [
+        "retired",
+        "housewife",
+        "salaried",
+        "business",
+        "student",
+        "unemployed",
+      ],
+    },
   },
 } as const
