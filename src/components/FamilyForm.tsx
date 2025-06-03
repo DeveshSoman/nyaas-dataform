@@ -1,1199 +1,907 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { calculateAge } from "@/utils/ageCalculator";
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-interface FamilyMember {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  age: number;
-  nativePlace?: string;
-  currentPlace?: string;
-  contactNumber?: string;
-  occupation?: string;
+// Global variables
+let familyData = {
+  familyHead: {},
+  spouse: {},
+  sons: [],
+  daughters: []
+};
+
+// Utility functions
+function calculateAge(birthDate) {
+  if (!birthDate) return '';
+  
+  const today = new Date();
+  const birth = new Date(birthDate);
+  
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  
+  return age;
 }
 
-interface Child extends FamilyMember {
-  phoneNumber?: string;
-  maritalStatus?: string;
-  spouse: ChildSpouse | null;
+function showToast(title, message) {
+  const toast = document.getElementById('toast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastMessage = document.getElementById('toastMessage');
+  
+  toastTitle.textContent = title;
+  toastMessage.textContent = message;
+  toast.style.display = 'block';
+  
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 3000);
 }
 
-interface ChildSpouse extends FamilyMember {
-  numberOfChildren: number;
-  grandchildren: Grandchild[];
+function validateContactNumber(number) {
+  return /^\d+$/.test(number);
 }
 
-interface Grandchild extends FamilyMember {
-  phoneNumber?: string;
-  currentPlace?: string;
+function updateDisplayName(firstName, lastName, titleElementId) {
+  const titleElement = document.getElementById(titleElementId);
+  const baseTitle = titleElement.textContent.split(' (')[0];
+  
+  if (firstName || lastName) {
+    const displayName = `${firstName} ${lastName}`.trim();
+    titleElement.textContent = `${baseTitle} (${displayName})`;
+  } else {
+    titleElement.textContent = baseTitle;
+  }
 }
 
-interface FamilyData {
-  familyHead: FamilyMember & {
-    maritalStatus: string;
-  };
-  spouse: FamilyMember & {
-    numberOfSons: number;
-    numberOfDaughters: number;
-  };
-  sons: Child[];
-  daughters: Child[];
-}
+// Event listeners for Family Head
+function setupFamilyHeadEvents() {
+  const firstNameInput = document.getElementById('headFirstName');
+  const lastNameInput = document.getElementById('headLastName');
+  const dateInput = document.getElementById('headDateOfBirth');
+  const nativeInput = document.getElementById('headNativePlace');
+  const currentInput = document.getElementById('headCurrentPlace');
+  const contactInput = document.getElementById('headContactNumber');
+  const maritalSelect = document.getElementById('headMaritalStatus');
+  const occupationSelect = document.getElementById('headOccupation');
 
-const FamilyForm = () => {
-  const [familyData, setFamilyData] = useState<FamilyData>({
-    familyHead: {
-      firstName: '',
-      lastName: '',
-      dateOfBirth: '',
-      age: 0,
-      maritalStatus: '',
-    },
-    spouse: {
-      firstName: '',
-      lastName: '',
-      dateOfBirth: '',
-      age: 0,
-      numberOfSons: 0,
-      numberOfDaughters: 0,
-    },
-    sons: [],
-    daughters: [],
+  // Convert to uppercase and update display
+  firstNameInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.familyHead.firstName = this.value;
+    updateDisplayName(this.value, lastNameInput.value, 'familyHeadTitle');
   });
 
-  const updateFamilyHead = (field: string, value: any) => {
-    setFamilyData(prev => ({
-      ...prev,
-      familyHead: {
-        ...prev.familyHead,
-        [field]: value
-      }
-    }));
-  };
+  lastNameInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.familyHead.lastName = this.value;
+    updateDisplayName(firstNameInput.value, this.value, 'familyHeadTitle');
+  });
 
-  const updateSpouse = (field: string, value: any) => {
-    setFamilyData(prev => ({
-      ...prev,
-      spouse: {
-        ...prev.spouse,
-        [field]: value
-      }
-    }));
-  };
+  nativeInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.familyHead.nativePlace = this.value;
+  });
 
-  const updateChild = (type: 'sons' | 'daughters', index: number, field: string, value: any) => {
-    setFamilyData(prev => {
-      const updatedChildren = [...prev[type]];
-      if (!updatedChildren[index]) {
-        updatedChildren[index] = {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          age: 0,
-          spouse: null
-        };
-      }
-      updatedChildren[index] = {
-        ...updatedChildren[index],
-        [field]: value
-      };
-      return {
-        ...prev,
-        [type]: updatedChildren
-      };
-    });
-  };
+  currentInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.familyHead.currentPlace = this.value;
+  });
 
-  const updateChildSpouse = (type: 'sons' | 'daughters', childIndex: number, field: string, value: any) => {
-    setFamilyData(prev => {
-      const updatedChildren = [...prev[type]];
-      if (!updatedChildren[childIndex].spouse) {
-        updatedChildren[childIndex].spouse = {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          age: 0,
-          numberOfChildren: 0,
-          grandchildren: []
-        };
-      }
-      updatedChildren[childIndex].spouse = {
-        ...updatedChildren[childIndex].spouse!,
-        [field]: value
-      };
-      return {
-        ...prev,
-        [type]: updatedChildren
-      };
-    });
-  };
-
-  const updateGrandchild = (
-    type: 'sons' | 'daughters',
-    childIndex: number,
-    grandchildIndex: number,
-    field: string,
-    value: any
-  ) => {
-    setFamilyData(prev => {
-      const updatedChildren = [...prev[type]];
-      const spouse = updatedChildren[childIndex].spouse;
-      if (!spouse) return prev;
-
-      const updatedGrandchildren = [...spouse.grandchildren];
-      if (!updatedGrandchildren[grandchildIndex]) {
-        updatedGrandchildren[grandchildIndex] = {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          age: 0
-        };
-      }
-      updatedGrandchildren[grandchildIndex] = {
-        ...updatedGrandchildren[grandchildIndex],
-        [field]: value
-      };
-
-      spouse.grandchildren = updatedGrandchildren;
-      return {
-        ...prev,
-        [type]: updatedChildren
-      };
-    });
-  };
-
-  const generateChildForms = (type: 'sons' | 'daughters', count: number) => {
-    setFamilyData(prev => {
-      const children = Array(count).fill(null).map((_, i) => {
-        return prev[type][i] || {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          age: 0,
-          spouse: null
-        };
-      });
-      return {
-        ...prev,
-        [type]: children
-      };
-    });
-  };
-
-  const generateGrandchildForms = (type: 'sons' | 'daughters', childIndex: number, count: number) => {
-    setFamilyData(prev => {
-      const updatedChildren = [...prev[type]];
-      const spouse = updatedChildren[childIndex].spouse;
-      if (!spouse) return prev;
-
-      spouse.grandchildren = Array(count).fill(null).map((_, i) => {
-        return spouse.grandchildren[i] || {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          age: 0
-        };
-      });
-
-      return {
-        ...prev,
-        [type]: updatedChildren
-      };
-    });
-  };
-
-  const validateForm = () => {
-    if (!familyData.familyHead.firstName || !familyData.familyHead.lastName || !familyData.familyHead.dateOfBirth) {
-      toast.error("Please fill in all required family head fields");
-      return false;
+  contactInput.addEventListener('input', function() {
+    familyData.familyHead.contactNumber = this.value;
+    const errorElement = document.getElementById('headContactNumberError');
+    if (this.value && !validateContactNumber(this.value)) {
+      errorElement.textContent = 'Contact number must contain only numbers';
+      errorElement.classList.add('show');
+    } else {
+      errorElement.classList.remove('show');
     }
-    return true;
-  };
+  });
 
-  const submitForm = async () => {
-    if (!validateForm()) return;
+  dateInput.addEventListener('change', function() {
+    familyData.familyHead.dateOfBirth = this.value;
+    const ageElement = document.getElementById('headAge');
+    if (this.value) {
+      ageElement.textContent = `Age: ${calculateAge(this.value)}`;
+    } else {
+      ageElement.textContent = '';
+    }
+  });
 
+  maritalSelect.addEventListener('change', function() {
+    familyData.familyHead.maritalStatus = this.value;
+    const spouseSection = document.getElementById('spouseSection');
+    if (this.value === 'married') {
+      spouseSection.style.display = 'block';
+    } else {
+      spouseSection.style.display = 'none';
+      // Reset spouse data
+      familyData.spouse = {};
+      resetSpouseForm();
+    }
+  });
+
+  occupationSelect.addEventListener('change', function() {
+    familyData.familyHead.occupation = this.value;
+  });
+}
+
+// Event listeners for Spouse
+function setupSpouseEvents() {
+  const firstNameInput = document.getElementById('spouseFirstName');
+  const lastNameInput = document.getElementById('spouseLastName');
+  const dateInput = document.getElementById('spouseDateOfBirth');
+  const nativeInput = document.getElementById('spouseNativePlace');
+  const contactInput = document.getElementById('spouseContactNumber');
+  const occupationSelect = document.getElementById('spouseOccupation');
+  const sonsSelect = document.getElementById('numberOfSons');
+  const daughtersSelect = document.getElementById('numberOfDaughters');
+
+  firstNameInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.spouse.firstName = this.value;
+    updateDisplayName(this.value, lastNameInput.value, 'spouseTitle');
+  });
+
+  lastNameInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.spouse.lastName = this.value;
+    updateDisplayName(firstNameInput.value, this.value, 'spouseTitle');
+  });
+
+  nativeInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    familyData.spouse.nativePlace = this.value;
+  });
+
+  contactInput.addEventListener('input', function() {
+    familyData.spouse.contactNumber = this.value;
+    const errorElement = document.getElementById('spouseContactNumberError');
+    if (this.value && !validateContactNumber(this.value)) {
+      errorElement.textContent = 'Contact number must contain only numbers';
+      errorElement.classList.add('show');
+    } else {
+      errorElement.classList.remove('show');
+    }
+  });
+
+  dateInput.addEventListener('change', function() {
+    familyData.spouse.dateOfBirth = this.value;
+    const ageElement = document.getElementById('spouseAge');
+    if (this.value) {
+      ageElement.textContent = `Age: ${calculateAge(this.value)}`;
+    } else {
+      ageElement.textContent = '';
+    }
+  });
+
+  occupationSelect.addEventListener('change', function() {
+    familyData.spouse.occupation = this.value;
+  });
+
+  sonsSelect.addEventListener('change', function() {
+    const numberOfSons = parseInt(this.value) || 0;
+    familyData.spouse.numberOfSons = numberOfSons;
+    generateChildrenForms('sons', numberOfSons);
+  });
+
+  daughtersSelect.addEventListener('change', function() {
+    const numberOfDaughters = parseInt(this.value) || 0;
+    familyData.spouse.numberOfDaughters = numberOfDaughters;
+    generateChildrenForms('daughters', numberOfDaughters);
+  });
+}
+
+function resetSpouseForm() {
+  const spouseInputs = ['spouseFirstName', 'spouseLastName', 'spouseContactNumber', 'spouseNativePlace', 'spouseDateOfBirth'];
+  spouseInputs.forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('spouseOccupation').selectedIndex = 0;
+  document.getElementById('numberOfSons').selectedIndex = 0;
+  document.getElementById('numberOfDaughters').selectedIndex = 0;
+  document.getElementById('spouseAge').textContent = '';
+  
+  // Hide children sections
+  document.getElementById('sonsSection').style.display = 'none';
+  document.getElementById('daughtersSection').style.display = 'none';
+}
+
+// Generate children forms
+function generateChildrenForms(type, count) {
+  const container = document.getElementById(type === 'sons' ? 'sonsContainer' : 'daughtersContainer');
+  const section = document.getElementById(type === 'sons' ? 'sonsSection' : 'daughtersSection');
+  
+  container.innerHTML = '';
+  
+  if (count > 0) {
+    section.style.display = 'block';
+    familyData[type] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const childData = {
+        firstName: '',
+        lastName: '',
+        contactNumber: '',
+        dateOfBirth: '',
+        occupation: '',
+        currentPlace: '',
+        phoneNumber: '',
+        maritalStatus: '',
+        spouse: null
+      };
+      
+      familyData[type].push(childData);
+      
+      const childForm = createChildForm(childData, i, type);
+      container.appendChild(childForm);
+    }
+  } else {
+    section.style.display = 'none';
+    familyData[type] = [];
+  }
+}
+
+function createChildForm(childData, index, type) {
+  const div = document.createElement('div');
+  div.className = 'child-form';
+  div.innerHTML = `
+    <h3>${type === 'sons' ? 'Son' : 'Daughter'} ${index + 1}</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="label">First Name / पहिले नाव</label>
+        <input type="text" class="input child-input" data-field="firstName" data-type="${type}" data-index="${index}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Last Name / आडनाव</label>
+        <input type="text" class="input child-input" data-field="lastName" data-type="${type}" data-index="${index}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Contact Number / संपर्क क्रमांक</label>
+        <input type="text" class="input child-input" data-field="contactNumber" data-type="${type}" data-index="${index}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Date of Birth / जन्म तारीख</label>
+        <input type="date" class="input child-input" data-field="dateOfBirth" data-type="${type}" data-index="${index}">
+        <div class="age-display" id="${type}Age${index}"></div>
+      </div>
+      <div>
+        <label class="label">Occupation / व्यवसाय</label>
+        <select class="input child-input" data-field="occupation" data-type="${type}" data-index="${index}">
+          <option value="">Select occupation / व्यवसाय निवडा</option>
+          <option value="salaried">Salaried / नोकरदार</option>
+          <option value="business">Business / व्यवसाय</option>
+          <option value="student">Student / विद्यार्थी</option>
+          <option value="unemployed">Unemployed / बेरोजगार</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Current Place / सध्याचे ठिकाण</label>
+        <input type="text" class="input child-input" data-field="currentPlace" data-type="${type}" data-index="${index}" placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Phone Number / फोन नंबर</label>
+        <input type="text" class="input child-input" data-field="phoneNumber" data-type="${type}" data-index="${index}" placeholder="Enter phone number / फोन नंबर प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Marital Status / वैवाहिक स्थिती</label>
+        <select class="input child-input" data-field="maritalStatus" data-type="${type}" data-index="${index}">
+          <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
+          <option value="single">Single / अविवाहित</option>
+          <option value="married">Married / विवाहित</option>
+          <option value="divorced">Divorced / घटस्फोटित</option>
+          <option value="widowed">Widowed / विधवा</option>
+        </select>
+      </div>
+    </div>
+    <div class="spouse-section" id="${type}Spouse${index}" style="display: none;">
+    </div>
+  `;
+  
+  setupChildEventListeners(div, index, type);
+  return div;
+}
+
+function setupChildEventListeners(container, index, type) {
+  const inputs = container.querySelectorAll('.child-input');
+  
+  inputs.forEach(input => {
+    input.addEventListener('input', function() {
+      updateChildData(this, index, type);
+    });
+    
+    input.addEventListener('change', function() {
+      updateChildData(this, index, type);
+    });
+  });
+}
+
+function updateChildData(input, index, type) {
+  const field = input.dataset.field;
+  let value = input.value;
+  
+  // Convert text inputs to uppercase
+  if (input.type === 'text') {
+    value = value.toUpperCase();
+    input.value = value;
+  }
+  
+  familyData[type][index][field] = value;
+  
+  // Handle age calculation for date of birth
+  if (field === 'dateOfBirth') {
+    const ageElement = document.getElementById(`${type}Age${index}`);
+    if (value) {
+      ageElement.textContent = `Age: ${calculateAge(value)}`;
+    } else {
+      ageElement.textContent = '';
+    }
+  }
+  
+  // Handle marital status change
+  if (field === 'maritalStatus') {
+    const spouseContainer = document.getElementById(`${type}Spouse${index}`);
+    if (value === 'married') {
+      spouseContainer.style.display = 'block';
+      createSpouseForm(spouseContainer, index, type);
+    } else {
+      spouseContainer.style.display = 'none';
+      familyData[type][index].spouse = null;
+    }
+  }
+}
+
+function createSpouseForm(container, childIndex, childType) {
+  if (!familyData[childType][childIndex].spouse) {
+    familyData[childType][childIndex].spouse = {
+      firstName: '',
+      lastName: '',
+      contactNumber: '',
+      nativePlace: '',
+      dateOfBirth: '',
+      occupation: '',
+      numberOfChildren: 0,
+      grandchildren: []
+    };
+  }
+  
+  const spouseTitle = childType === 'sons' ? 'Wife' : 'Husband';
+  
+  container.innerHTML = `
+    <h4>${spouseTitle} Information</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="label">First Name / पहिले नाव</label>
+        <input type="text" class="input spouse-input" data-field="firstName" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Last Name / आडनाव</label>
+        <input type="text" class="input spouse-input" data-field="lastName" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Contact Number / संपर्क क्रमांक</label>
+        <input type="text" class="input spouse-input" data-field="contactNumber" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Native Place / मूळ गाव</label>
+        <input type="text" class="input spouse-input" data-field="nativePlace" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter native place / मूळ गाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Date of Birth / जन्म तारीख</label>
+        <input type="date" class="input spouse-input" data-field="dateOfBirth" data-child-type="${childType}" data-child-index="${childIndex}">
+        <div class="age-display" id="${childType}SpouseAge${childIndex}"></div>
+      </div>
+      <div>
+        <label class="label">Occupation / व्यवसाय</label>
+        <select class="input spouse-input" data-field="occupation" data-child-type="${childType}" data-child-index="${childIndex}">
+          <option value="">Select occupation / व्यवसाय निवडा</option>
+          <option value="retired">Retired / निवृत्त</option>
+          <option value="housewife">Housewife / गृहिणी</option>
+          <option value="salaried">Salaried / नोकरदार</option>
+          <option value="business">Business / व्यवसाय</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Number of Children / मुलांची संख्या</label>
+        <select class="input spouse-input" data-field="numberOfChildren" data-child-type="${childType}" data-child-index="${childIndex}">
+          <option value="">Select number of children / मुलांची संख्या निवडा</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+    </div>
+    <div class="grandchildren-section" id="${childType}Grandchildren${childIndex}" style="display: none;">
+    </div>
+  `;
+  
+  setupSpouseEventListeners(container, childIndex, childType);
+}
+
+function setupSpouseEventListeners(container, childIndex, childType) {
+  const inputs = container.querySelectorAll('.spouse-input');
+  
+  inputs.forEach(input => {
+    input.addEventListener('input', function() {
+      updateSpouseData(this, childIndex, childType);
+    });
+    
+    input.addEventListener('change', function() {
+      updateSpouseData(this, childIndex, childType);
+    });
+  });
+}
+
+function updateSpouseData(input, childIndex, childType) {
+  const field = input.dataset.field;
+  let value = input.value;
+  
+  // Convert text inputs to uppercase
+  if (input.type === 'text') {
+    value = value.toUpperCase();
+    input.value = value;
+  }
+  
+  // Handle number of children
+  if (field === 'numberOfChildren') {
+    value = parseInt(value) || 0;
+  }
+  
+  familyData[childType][childIndex].spouse[field] = value;
+  
+  // Handle age calculation for date of birth
+  if (field === 'dateOfBirth') {
+    const ageElement = document.getElementById(`${childType}SpouseAge${childIndex}`);
+    if (value) {
+      ageElement.textContent = `Age: ${calculateAge(value)}`;
+    } else {
+      ageElement.textContent = '';
+    }
+  }
+  
+  // Handle number of children change
+  if (field === 'numberOfChildren') {
+    const grandchildrenContainer = document.getElementById(`${childType}Grandchildren${childIndex}`);
+    if (value > 0) {
+      grandchildrenContainer.style.display = 'block';
+      createGrandchildrenForms(grandchildrenContainer, value, childIndex, childType);
+    } else {
+      grandchildrenContainer.style.display = 'none';
+      familyData[childType][childIndex].spouse.grandchildren = [];
+    }
+  }
+}
+
+function createGrandchildrenForms(container, count, childIndex, childType) {
+  familyData[childType][childIndex].spouse.grandchildren = [];
+  
+  container.innerHTML = '<h5>Grandchildren / नातवंडे</h5>';
+  
+  for (let i = 0; i < count; i++) {
+    const grandchildData = {
+      firstName: '',
+      lastName: '',
+      contactNumber: '',
+      dateOfBirth: '',
+      occupation: '',
+      currentPlace: '',
+      phoneNumber: ''
+    };
+    
+    familyData[childType][childIndex].spouse.grandchildren.push(grandchildData);
+    
+    const grandchildForm = createGrandchildForm(grandchildData, i, childIndex, childType);
+    container.appendChild(grandchildForm);
+  }
+}
+
+function createGrandchildForm(grandchildData, grandchildIndex, childIndex, childType) {
+  const div = document.createElement('div');
+  div.className = 'grandchild-form';
+  div.innerHTML = `
+    <h4>Grandchild ${grandchildIndex + 1}</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="label">First Name / पहिले नाव</label>
+        <input type="text" class="input grandchild-input" data-field="firstName" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Last Name / आडनाव</label>
+        <input type="text" class="input grandchild-input" data-field="lastName" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Contact Number / संपर्क क्रमांक</label>
+        <input type="text" class="input grandchild-input" data-field="contactNumber" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Date of Birth / जन्म तारीख</label>
+        <input type="date" class="input grandchild-input" data-field="dateOfBirth" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}">
+        <div class="age-display" id="${childType}GrandchildAge${childIndex}_${grandchildIndex}"></div>
+      </div>
+      <div>
+        <label class="label">Occupation / व्यवसाय</label>
+        <select class="input grandchild-input" data-field="occupation" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}">
+          <option value="">Select occupation / व्यवसाय निवडा</option>
+          <option value="salaried">Salaried / नोकरदार</option>
+          <option value="business">Business / व्यवसाय</option>
+          <option value="student">Student / विद्यार्थी</option>
+          <option value="unemployed">Unemployed / बेरोजगार</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Current Place / सध्याचे ठिकाण</label>
+        <input type="text" class="input grandchild-input" data-field="currentPlace" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा">
+      </div>
+      <div>
+        <label class="label">Phone Number / फोन नंबर</label>
+        <input type="text" class="input grandchild-input" data-field="phoneNumber" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter phone number / फोन नंबर प्रविष्ट करा">
+      </div>
+    </div>
+  `;
+  
+  setupGrandchildEventListeners(div, grandchildIndex, childIndex, childType);
+  return div;
+}
+
+function setupGrandchildEventListeners(container, grandchildIndex, childIndex, childType) {
+  const inputs = container.querySelectorAll('.grandchild-input');
+  
+  inputs.forEach(input => {
+    input.addEventListener('input', function() {
+      updateGrandchildData(this, grandchildIndex, childIndex, childType);
+    });
+    
+    input.addEventListener('change', function() {
+      updateGrandchildData(this, grandchildIndex, childIndex, childType);
+    });
+  });
+}
+
+function updateGrandchildData(input, grandchildIndex, childIndex, childType) {
+  const field = input.dataset.field;
+  let value = input.value;
+  
+  // Convert text inputs to uppercase
+  if (input.type === 'text') {
+    value = value.toUpperCase();
+    input.value = value;
+  }
+  
+  familyData[childType][childIndex].spouse.grandchildren[grandchildIndex][field] = value;
+  
+  // Handle age calculation for date of birth
+  if (field === 'dateOfBirth') {
+    const ageElement = document.getElementById(`${childType}GrandchildAge${childIndex}_${grandchildIndex}`);
+    if (value) {
+      ageElement.textContent = `Age: ${calculateAge(value)}`;
+    } else {
+      ageElement.textContent = '';
+    }
+  }
+}
+
+// Form validation
+function validateForm() {
+  let isValid = true;
+  const errors = [];
+  
+  // Validate family head
+  if (!familyData.familyHead.firstName) {
+    errors.push('Family head first name is required');
+    isValid = false;
+  }
+  
+  if (!familyData.familyHead.lastName) {
+    errors.push('Family head last name is required');
+    isValid = false;
+  }
+  
+  if (!familyData.familyHead.dateOfBirth) {
+    errors.push('Family head date of birth is required');
+    isValid = false;
+  }
+  
+  if (familyData.familyHead.contactNumber && !validateContactNumber(familyData.familyHead.contactNumber)) {
+    errors.push('Family head contact number must contain only numbers');
+    isValid = false;
+  }
+  
+  // Validate spouse if married
+  if (familyData.familyHead.maritalStatus === 'married') {
+    if (familyData.spouse.contactNumber && !validateContactNumber(familyData.spouse.contactNumber)) {
+      errors.push('Spouse contact number must contain only numbers');
+      isValid = false;
+    }
+  }
+  
+  return { isValid, errors };
+}
+
+// Submit form
+async function submitForm() {
+  const validation = validateForm();
+  
+  if (validation.isValid) {
     try {
       console.log('Starting form submission...');
       
+      // Calculate age for family head
+      const headAge = calculateAge(familyData.familyHead.dateOfBirth);
+      
       // Insert family head
-      const familyHeadData = {
-        first_name: familyData.familyHead.firstName,
-        last_name: familyData.familyHead.lastName,
-        date_of_birth: familyData.familyHead.dateOfBirth,
-        age: familyData.familyHead.age,
-        native_place: familyData.familyHead.nativePlace || null,
-        current_place: familyData.familyHead.currentPlace || null,
-        contact_number: familyData.familyHead.contactNumber || null,
-        marital_status: familyData.familyHead.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
-        occupation: familyData.familyHead.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed' || null
-      };
-
-      const { data: familyHead, error: familyHeadError } = await supabase
+      const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
-        .insert([familyHeadData])
+        .insert({
+          first_name: familyData.familyHead.firstName,
+          last_name: familyData.familyHead.lastName,
+          date_of_birth: familyData.familyHead.dateOfBirth,
+          age: headAge,
+          native_place: familyData.familyHead.nativePlace || null,
+          current_place: familyData.familyHead.currentPlace || null,
+          contact_number: familyData.familyHead.contactNumber || null,
+          marital_status: familyData.familyHead.maritalStatus,
+          occupation: familyData.familyHead.occupation || null
+        })
         .select()
         .single();
 
-      if (familyHeadError) throw familyHeadError;
+      if (familyHeadError) {
+        console.error('Family head error:', familyHeadError);
+        throw familyHeadError;
+      }
 
-      console.log('Family head saved:', familyHead);
+      console.log('Family head inserted:', familyHeadData);
+      const familyHeadId = familyHeadData.id;
 
       // Insert spouse if married
-      if (familyData.familyHead.maritalStatus === 'married' && familyData.spouse.firstName) {
-        const spouseData = {
-          family_head_id: familyHead.id,
-          first_name: familyData.spouse.firstName,
-          last_name: familyData.spouse.lastName || null,
-          date_of_birth: familyData.spouse.dateOfBirth || null,
-          age: familyData.spouse.age || null,
-          native_place: familyData.spouse.nativePlace || null,
-          contact_number: familyData.spouse.contactNumber || null,
-          occupation: familyData.spouse.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed' || null,
-          number_of_sons: familyData.spouse.numberOfSons || 0,
-          number_of_daughters: familyData.spouse.numberOfDaughters || 0
-        };
-
-        const { data: spouse, error: spouseError } = await supabase
+      let spouseId = null;
+      if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
+        const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
+        
+        const { data: spouseData, error: spouseError } = await supabase
           .from('spouses')
-          .insert([spouseData])
+          .insert({
+            family_head_id: familyHeadId,
+            first_name: familyData.spouse.firstName || null,
+            last_name: familyData.spouse.lastName || null,
+            date_of_birth: familyData.spouse.dateOfBirth || null,
+            age: spouseAge,
+            native_place: familyData.spouse.nativePlace || null,
+            contact_number: familyData.spouse.contactNumber || null,
+            occupation: familyData.spouse.occupation || null,
+            number_of_sons: familyData.spouse.numberOfSons || 0,
+            number_of_daughters: familyData.spouse.numberOfDaughters || 0
+          })
           .select()
           .single();
 
-        if (spouseError) throw spouseError;
-        console.log('Spouse saved:', spouse);
+        if (spouseError) {
+          console.error('Spouse error:', spouseError);
+          throw spouseError;
+        }
+        
+        console.log('Spouse inserted:', spouseData);
+        spouseId = spouseData.id;
       }
 
-      // Insert children (sons and daughters)
-      for (const [type, children] of [['son', familyData.sons], ['daughter', familyData.daughters]] as const) {
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i];
-          if (child.firstName) {
-            const childData = {
-              family_head_id: familyHead.id,
-              first_name: child.firstName,
-              last_name: child.lastName || null,
-              contact_number: child.contactNumber || null,
-              date_of_birth: child.dateOfBirth || null,
-              age: child.age || null,
-              occupation: child.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed' || null,
-              current_place: child.currentPlace || null,
-              phone_number: child.phoneNumber || null,
-              marital_status: child.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed' || null,
-              child_type: type,
-              child_index: i
-            };
+      // Insert children (sons)
+      for (let i = 0; i < familyData.sons.length; i++) {
+        const son = familyData.sons[i];
+        if (!son.firstName && !son.lastName) continue;
 
-            const { data: savedChild, error: childError } = await supabase
-              .from('children')
-              .insert([childData])
-              .select()
-              .single();
+        const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
+        
+        const { data: sonData, error: sonError } = await supabase
+          .from('children')
+          .insert({
+            family_head_id: familyHeadId,
+            first_name: son.firstName || null,
+            last_name: son.lastName || null,
+            contact_number: son.contactNumber || null,
+            date_of_birth: son.dateOfBirth || null,
+            age: sonAge,
+            occupation: son.occupation || null,
+            current_place: son.currentPlace || null,
+            phone_number: son.phoneNumber || null,
+            marital_status: son.maritalStatus || null,
+            child_type: 'son',
+            child_index: i
+          })
+          .select()
+          .single();
 
-            if (childError) throw childError;
-            console.log(`${type} saved:`, savedChild);
+        if (sonError) {
+          console.error('Son error:', sonError);
+          throw sonError;
+        }
 
-            // Insert child spouse if married
-            if (child.maritalStatus === 'married' && child.spouse?.firstName) {
-              const childSpouseData = {
-                child_id: savedChild.id,
-                first_name: child.spouse.firstName,
-                last_name: child.spouse.lastName || null,
-                contact_number: child.spouse.contactNumber || null,
-                native_place: child.spouse.nativePlace || null,
-                date_of_birth: child.spouse.dateOfBirth || null,
-                age: child.spouse.age || null,
-                occupation: child.spouse.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed' || null,
-                number_of_children: child.spouse.numberOfChildren || 0
-              };
+        console.log('Son inserted:', sonData);
 
-              const { data: savedChildSpouse, error: childSpouseError } = await supabase
-                .from('child_spouses')
-                .insert([childSpouseData])
-                .select()
-                .single();
+        // Insert son's spouse if married
+        if (son.maritalStatus === 'married' && son.spouse) {
+          const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
+          
+          const { data: sonSpouseData, error: sonSpouseError } = await supabase
+            .from('child_spouses')
+            .insert({
+              child_id: sonData.id,
+              first_name: son.spouse.firstName || null,
+              last_name: son.spouse.lastName || null,
+              contact_number: son.spouse.contactNumber || null,
+              native_place: son.spouse.nativePlace || null,
+              date_of_birth: son.spouse.dateOfBirth || null,
+              age: sonSpouseAge,
+              occupation: son.spouse.occupation || null,
+              number_of_children: son.spouse.numberOfChildren || 0
+            })
+            .select()
+            .single();
 
-              if (childSpouseError) throw childSpouseError;
-              console.log('Child spouse saved:', savedChildSpouse);
+          if (sonSpouseError) {
+            console.error('Son spouse error:', sonSpouseError);
+            throw sonSpouseError;
+          }
 
-              // Insert grandchildren
-              if (child.spouse.grandchildren) {
-                for (let j = 0; j < child.spouse.grandchildren.length; j++) {
-                  const grandchild = child.spouse.grandchildren[j];
-                  if (grandchild.firstName) {
-                    const grandchildData = {
-                      child_spouse_id: savedChildSpouse.id,
-                      first_name: grandchild.firstName,
-                      last_name: grandchild.lastName || null,
-                      contact_number: grandchild.contactNumber || null,
-                      date_of_birth: grandchild.dateOfBirth || null,
-                      age: grandchild.age || null,
-                      occupation: grandchild.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed' || null,
-                      current_place: grandchild.currentPlace || null,
-                      phone_number: grandchild.phoneNumber || null,
-                      grandchild_index: j
-                    };
+          console.log('Son spouse inserted:', sonSpouseData);
 
-                    const { error: grandchildError } = await supabase
-                      .from('grandchildren')
-                      .insert([grandchildData]);
+          // Insert grandchildren
+          if (son.spouse.grandchildren) {
+            for (let j = 0; j < son.spouse.grandchildren.length; j++) {
+              const grandchild = son.spouse.grandchildren[j];
+              if (!grandchild.firstName && !grandchild.lastName) continue;
 
-                    if (grandchildError) throw grandchildError;
-                  }
-                }
+              const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+              
+              const { error: grandchildError } = await supabase
+                .from('grandchildren')
+                .insert({
+                  child_spouse_id: sonSpouseData.id,
+                  first_name: grandchild.firstName || null,
+                  last_name: grandchild.lastName || null,
+                  contact_number: grandchild.contactNumber || null,
+                  date_of_birth: grandchild.dateOfBirth || null,
+                  age: grandchildAge,
+                  occupation: grandchild.occupation || null,
+                  current_place: grandchild.currentPlace || null,
+                  phone_number: grandchild.phoneNumber || null,
+                  grandchild_index: j
+                });
+
+              if (grandchildError) {
+                console.error('Grandchild error:', grandchildError);
+                throw grandchildError;
               }
             }
           }
         }
       }
 
-      toast.success("Family information saved successfully!");
-      console.log('All family data saved successfully');
+      // Insert children (daughters)
+      for (let i = 0; i < familyData.daughters.length; i++) {
+        const daughter = familyData.daughters[i];
+        if (!daughter.firstName && !daughter.lastName) continue;
+
+        const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
+        
+        const { data: daughterData, error: daughterError } = await supabase
+          .from('children')
+          .insert({
+            family_head_id: familyHeadId,
+            first_name: daughter.firstName || null,
+            last_name: daughter.lastName || null,
+            contact_number: daughter.contactNumber || null,
+            date_of_birth: daughter.dateOfBirth || null,
+            age: daughterAge,
+            occupation: daughter.occupation || null,
+            current_place: daughter.currentPlace || null,
+            phone_number: daughter.phoneNumber || null,
+            marital_status: daughter.maritalStatus || null,
+            child_type: 'daughter',
+            child_index: i
+          })
+          .select()
+          .single();
+
+        if (daughterError) {
+          console.error('Daughter error:', daughterError);
+          throw daughterError;
+        }
+
+        console.log('Daughter inserted:', daughterData);
+
+        // Insert daughter's spouse if married
+        if (daughter.maritalStatus === 'married' && daughter.spouse) {
+          const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
+          
+          const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
+            .from('child_spouses')
+            .insert({
+              child_id: daughterData.id,
+              first_name: daughter.spouse.firstName || null,
+              last_name: daughter.spouse.lastName || null,
+              contact_number: daughter.spouse.contactNumber || null,
+              native_place: daughter.spouse.nativePlace || null,
+              date_of_birth: daughter.spouse.dateOfBirth || null,
+              age: daughterSpouseAge,
+              occupation: daughter.spouse.occupation || null,
+              number_of_children: daughter.spouse.numberOfChildren || 0
+            })
+            .select()
+            .single();
+
+          if (daughterSpouseError) {
+            console.error('Daughter spouse error:', daughterSpouseError);
+            throw daughterSpouseError;
+          }
+
+          console.log('Daughter spouse inserted:', daughterSpouseData);
+
+          // Insert grandchildren
+          if (daughter.spouse.grandchildren) {
+            for (let j = 0; j < daughter.spouse.grandchildren.length; j++) {
+              const grandchild = daughter.spouse.grandchildren[j];
+              if (!grandchild.firstName && !grandchild.lastName) continue;
+
+              const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+              
+              const { error: grandchildError } = await supabase
+                .from('grandchildren')
+                .insert({
+                  child_spouse_id: daughterSpouseData.id,
+                  first_name: grandchild.firstName || null,
+                  last_name: grandchild.lastName || null,
+                  contact_number: grandchild.contactNumber || null,
+                  date_of_birth: grandchild.dateOfBirth || null,
+                  age: grandchildAge,
+                  occupation: grandchild.occupation || null,
+                  current_place: grandchild.currentPlace || null,
+                  phone_number: grandchild.phoneNumber || null,
+                  grandchild_index: j
+                });
+
+              if (grandchildError) {
+                console.error('Grandchild error:', grandchildError);
+                throw grandchildError;
+              }
+            }
+          }
+        }
+      }
+
+      showToast('Form Submitted Successfully!', 'Family information has been saved.');
+      console.log('Form submission completed successfully');
       
     } catch (error) {
-      console.error('Error saving family data:', error);
-      toast.error("Failed to save family information. Please try again.");
+      console.error('Form submission error:', error);
+      showToast('Error', 'Failed to save family information. Please try again.');
     }
-  };
+  } else {
+    showToast('Validation Error', validation.errors.join(', '));
+  }
+}
 
-  return (
-    <div className="space-y-6">
-      {/* Family Head Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle id="familyHeadTitle">Family Head Information</CardTitle>
-          <CardDescription>Enter details for the head of the family</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="headFirstName">First Name / पहिले नाव *</Label>
-              <Input
-                id="headFirstName"
-                value={familyData.familyHead.firstName}
-                onChange={(e) => updateFamilyHead('firstName', e.target.value.toUpperCase())}
-                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="headLastName">Last Name / आडनाव *</Label>
-              <Input
-                id="headLastName"
-                value={familyData.familyHead.lastName}
-                onChange={(e) => updateFamilyHead('lastName', e.target.value.toUpperCase())}
-                placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="headDateOfBirth">Date of Birth / जन्म तारीख *</Label>
-              <Input
-                id="headDateOfBirth"
-                type="date"
-                value={familyData.familyHead.dateOfBirth}
-                onChange={(e) => {
-                  const date = e.target.value;
-                  const age = date ? calculateAge(date) : 0;
-                  updateFamilyHead('dateOfBirth', date);
-                  updateFamilyHead('age', age);
-                }}
-                required
-              />
-              {familyData.familyHead.age > 0 && (
-                <div className="text-sm text-gray-600 mt-1">Age: {familyData.familyHead.age}</div>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="headNativePlace">Native Place / मूळ गाव</Label>
-              <Input
-                id="headNativePlace"
-                value={familyData.familyHead.nativePlace}
-                onChange={(e) => updateFamilyHead('nativePlace', e.target.value.toUpperCase())}
-                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <Label htmlFor="headCurrentPlace">Current Place / सध्याचे ठिकाण</Label>
-              <Input
-                id="headCurrentPlace"
-                value={familyData.familyHead.currentPlace}
-                onChange={(e) => updateFamilyHead('currentPlace', e.target.value.toUpperCase())}
-                placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <Label htmlFor="headContactNumber">Contact Number / संपर्क क्रमांक</Label>
-              <Input
-                id="headContactNumber"
-                value={familyData.familyHead.contactNumber}
-                onChange={(e) => updateFamilyHead('contactNumber', e.target.value)}
-                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <Label htmlFor="headMaritalStatus">Marital Status / वैवाहिक स्थिती *</Label>
-              <Select 
-                value={familyData.familyHead.maritalStatus} 
-                onValueChange={(value) => updateFamilyHead('maritalStatus', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select marital status / वैवाहिक स्थिती निवडा" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="single">Single / अविवाहित</SelectItem>
-                  <SelectItem value="married">Married / विवाहित</SelectItem>
-                  <SelectItem value="divorced">Divorced / घटस्फोटित</SelectItem>
-                  <SelectItem value="widowed">Widowed / विधवा</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="headOccupation">Occupation / व्यवसाय</Label>
-              <Select 
-                value={familyData.familyHead.occupation} 
-                onValueChange={(value) => updateFamilyHead('occupation', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="retired">Retired / निवृत्त</SelectItem>
-                  <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
-                  <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                  <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                  <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                  <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+// Initialize the application
+function init() {
+  setupFamilyHeadEvents();
+  setupSpouseEvents();
+  
+  // Submit button event
+  document.getElementById('submitBtn').addEventListener('click', submitForm);
+  
+  console.log('Family form initialized');
+}
 
-      {/* Spouse Section */}
-      {familyData.familyHead.maritalStatus === 'married' && (
-        <Card>
-          <CardHeader>
-            <CardTitle id="spouseTitle">Spouse Information</CardTitle>
-            <CardDescription>Enter details for the spouse</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="spouseFirstName">First Name / पहिले नाव</Label>
-                <Input
-                  id="spouseFirstName"
-                  value={familyData.spouse.firstName}
-                  onChange={(e) => updateSpouse('firstName', e.target.value.toUpperCase())}
-                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <Label htmlFor="spouseLastName">Last Name / आडनाव</Label>
-                <Input
-                  id="spouseLastName"
-                  value={familyData.spouse.lastName}
-                  onChange={(e) => updateSpouse('lastName', e.target.value.toUpperCase())}
-                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <Label htmlFor="spouseDateOfBirth">Date of Birth / जन्म तारीख</Label>
-                <Input
-                  id="spouseDateOfBirth"
-                  type="date"
-                  value={familyData.spouse.dateOfBirth}
-                  onChange={(e) => {
-                    const date = e.target.value;
-                    const age = date ? calculateAge(date) : 0;
-                    updateSpouse('dateOfBirth', date);
-                    updateSpouse('age', age);
-                  }}
-                />
-                {familyData.spouse.age > 0 && (
-                  <div className="text-sm text-gray-600 mt-1">Age: {familyData.spouse.age}</div>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="spouseNativePlace">Native Place / मूळ गाव</Label>
-                <Input
-                  id="spouseNativePlace"
-                  value={familyData.spouse.nativePlace}
-                  onChange={(e) => updateSpouse('nativePlace', e.target.value.toUpperCase())}
-                  placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <Label htmlFor="spouseContactNumber">Contact Number / संपर्क क्रमांक</Label>
-                <Input
-                  id="spouseContactNumber"
-                  value={familyData.spouse.contactNumber}
-                  onChange={(e) => updateSpouse('contactNumber', e.target.value)}
-                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <Label htmlFor="spouseOccupation">Occupation / व्यवसाय</Label>
-                <Select 
-                  value={familyData.spouse.occupation} 
-                  onValueChange={(value) => updateSpouse('occupation', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="retired">Retired / निवृत्त</SelectItem>
-                    <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
-                    <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                    <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                    <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                    <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="numberOfSons">Number of Sons / मुलांची संख्या</Label>
-                <Select 
-                  value={String(familyData.spouse.numberOfSons)} 
-                  onValueChange={(value) => {
-                    const count = parseInt(value);
-                    updateSpouse('numberOfSons', count);
-                    generateChildForms('sons', count);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select number of sons / मुलांची संख्या निवडा" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[0, 1, 2, 3, 4, 5].map(num => (
-                      <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="numberOfDaughters">Number of Daughters / मुलींची संख्या</Label>
-                <Select 
-                  value={String(familyData.spouse.numberOfDaughters)} 
-                  onValueChange={(value) => {
-                    const count = parseInt(value);
-                    updateSpouse('numberOfDaughters', count);
-                    generateChildForms('daughters', count);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select number of daughters / मुलींची संख्या निवडा" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[0, 1, 2, 3, 4, 5].map(num => (
-                      <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Sons Section */}
-      {familyData.spouse.numberOfSons > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sons Information</CardTitle>
-            <CardDescription>Enter details for each son</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {familyData.sons.map((son, index) => (
-              <div key={index} className="border p-4 rounded-lg">
-                <h3 className="text-lg font-medium mb-4">Son {index + 1}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>First Name / पहिले नाव</Label>
-                    <Input
-                      value={son.firstName}
-                      onChange={(e) => updateChild('sons', index, 'firstName', e.target.value.toUpperCase())}
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Last Name / आडनाव</Label>
-                    <Input
-                      value={son.lastName}
-                      onChange={(e) => updateChild('sons', index, 'lastName', e.target.value.toUpperCase())}
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Contact Number / संपर्क क्रमांक</Label>
-                    <Input
-                      value={son.contactNumber}
-                      onChange={(e) => updateChild('sons', index, 'contactNumber', e.target.value)}
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Date of Birth / जन्म तारीख</Label>
-                    <Input
-                      type="date"
-                      value={son.dateOfBirth}
-                      onChange={(e) => {
-                        const date = e.target.value;
-                        const age = date ? calculateAge(date) : 0;
-                        updateChild('sons', index, 'dateOfBirth', date);
-                        updateChild('sons', index, 'age', age);
-                      }}
-                    />
-                    {son.age > 0 && (
-                      <div className="text-sm text-gray-600 mt-1">Age: {son.age}</div>
-                    )}
-                  </div>
-                  <div>
-                    <Label>Occupation / व्यवसाय</Label>
-                    <Select 
-                      value={son.occupation} 
-                      onValueChange={(value) => updateChild('sons', index, 'occupation', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                        <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                        <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                        <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Current Place / सध्याचे ठिकाण</Label>
-                    <Input
-                      value={son.currentPlace}
-                      onChange={(e) => updateChild('sons', index, 'currentPlace', e.target.value.toUpperCase())}
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Phone Number / फोन नंबर</Label>
-                    <Input
-                      value={son.phoneNumber}
-                      onChange={(e) => updateChild('sons', index, 'phoneNumber', e.target.value)}
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Marital Status / वैवाहिक स्थिती</Label>
-                    <Select 
-                      value={son.maritalStatus} 
-                      onValueChange={(value) => updateChild('sons', index, 'maritalStatus', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select marital status / वैवाहिक स्थिती निवडा" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single / अविवाहित</SelectItem>
-                        <SelectItem value="married">Married / विवाहित</SelectItem>
-                        <SelectItem value="divorced">Divorced / घटस्फोटित</SelectItem>
-                        <SelectItem value="widowed">Widowed / विधवा</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Son's Spouse Section */}
-                {son.maritalStatus === 'married' && (
-                  <div className="mt-6 border-t pt-4">
-                    <h4 className="text-md font-medium mb-4">Wife Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>First Name / पहिले नाव</Label>
-                        <Input
-                          value={son.spouse?.firstName || ''}
-                          onChange={(e) => updateChildSpouse('sons', index, 'firstName', e.target.value.toUpperCase())}
-                          placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Last Name / आडनाव</Label>
-                        <Input
-                          value={son.spouse?.lastName || ''}
-                          onChange={(e) => updateChildSpouse('sons', index, 'lastName', e.target.value.toUpperCase())}
-                          placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Contact Number / संपर्क क्रमांक</Label>
-                        <Input
-                          value={son.spouse?.contactNumber || ''}
-                          onChange={(e) => updateChildSpouse('sons', index, 'contactNumber', e.target.value)}
-                          placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Native Place / मूळ गाव</Label>
-                        <Input
-                          value={son.spouse?.nativePlace || ''}
-                          onChange={(e) => updateChildSpouse('sons', index, 'nativePlace', e.target.value.toUpperCase())}
-                          placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Date of Birth / जन्म तारीख</Label>
-                        <Input
-                          type="date"
-                          value={son.spouse?.dateOfBirth || ''}
-                          onChange={(e) => {
-                            const date = e.target.value;
-                            const age = date ? calculateAge(date) : 0;
-                            updateChildSpouse('sons', index, 'dateOfBirth', date);
-                            updateChildSpouse('sons', index, 'age', age);
-                          }}
-                        />
-                        {son.spouse?.age > 0 && (
-                          <div className="text-sm text-gray-600 mt-1">Age: {son.spouse.age}</div>
-                        )}
-                      </div>
-                      <div>
-                        <Label>Occupation / व्यवसाय</Label>
-                        <Select 
-                          value={son.spouse?.occupation || ''} 
-                          onValueChange={(value) => updateChildSpouse('sons', index, 'occupation', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
-                            <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                            <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                            <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                            <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Number of Children / मुलांची संख्या</Label>
-                        <Select 
-                          value={String(son.spouse?.numberOfChildren || 0)} 
-                          onValueChange={(value) => {
-                            const count = parseInt(value);
-                            updateChildSpouse('sons', index, 'numberOfChildren', count);
-                            generateGrandchildForms('sons', index, count);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select number of children / मुलांची संख्या निवडा" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[0, 1, 2, 3, 4, 5].map(num => (
-                              <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Grandchildren Section */}
-                    {son.spouse?.numberOfChildren > 0 && (
-                      <div className="mt-6 border-t pt-4">
-                        <h5 className="text-md font-medium mb-4">Grandchildren / नातवंडे</h5>
-                        {son.spouse.grandchildren.map((grandchild, gIndex) => (
-                          <div key={gIndex} className="mb-6 p-3 bg-gray-50 rounded-lg">
-                            <h6 className="text-sm font-medium mb-3">Grandchild {gIndex + 1}</h6>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div>
-                                <Label>First Name / पहिले नाव</Label>
-                                <Input
-                                  value={grandchild.firstName}
-                                  onChange={(e) => updateGrandchild('sons', index, gIndex, 'firstName', e.target.value.toUpperCase())}
-                                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Last Name / आडनाव</Label>
-                                <Input
-                                  value={grandchild.lastName}
-                                  onChange={(e) => updateGrandchild('sons', index, gIndex, 'lastName', e.target.value.toUpperCase())}
-                                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Contact Number / संपर्क क्रमांक</Label>
-                                <Input
-                                  value={grandchild.contactNumber}
-                                  onChange={(e) => updateGrandchild('sons', index, gIndex, 'contactNumber', e.target.value)}
-                                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Date of Birth / जन्म तारीख</Label>
-                                <Input
-                                  type="date"
-                                  value={grandchild.dateOfBirth}
-                                  onChange={(e) => {
-                                    const date = e.target.value;
-                                    const age = date ? calculateAge(date) : 0;
-                                    updateGrandchild('sons', index, gIndex, 'dateOfBirth', date);
-                                    updateGrandchild('sons', index, gIndex, 'age', age);
-                                  }}
-                                />
-                                {grandchild.age > 0 && (
-                                  <div className="text-sm text-gray-600 mt-1">Age: {grandchild.age}</div>
-                                )}
-                              </div>
-                              <div>
-                                <Label>Occupation / व्यवसाय</Label>
-                                <Select 
-                                  value={grandchild.occupation} 
-                                  onValueChange={(value) => updateGrandchild('sons', index, gIndex, 'occupation', value)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                                    <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                                    <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                                    <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label>Current Place / सध्याचे ठिकाण</Label>
-                                <Input
-                                  value={grandchild.currentPlace}
-                                  onChange={(e) => updateGrandchild('sons', index, gIndex, 'currentPlace', e.target.value.toUpperCase())}
-                                  placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Phone Number / फोन नंबर</Label>
-                                <Input
-                                  value={grandchild.phoneNumber}
-                                  onChange={(e) => updateGrandchild('sons', index, gIndex, 'phoneNumber', e.target.value)}
-                                  placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Daughters Section */}
-      {familyData.spouse.numberOfDaughters > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Daughters Information</CardTitle>
-            <CardDescription>Enter details for each daughter</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {familyData.daughters.map((daughter, index) => (
-              <div key={index} className="border p-4 rounded-lg">
-                <h3 className="text-lg font-medium mb-4">Daughter {index + 1}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>First Name / पहिले नाव</Label>
-                    <Input
-                      value={daughter.firstName}
-                      onChange={(e) => updateChild('daughters', index, 'firstName', e.target.value.toUpperCase())}
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Last Name / आडनाव</Label>
-                    <Input
-                      value={daughter.lastName}
-                      onChange={(e) => updateChild('daughters', index, 'lastName', e.target.value.toUpperCase())}
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Contact Number / संपर्क क्रमांक</Label>
-                    <Input
-                      value={daughter.contactNumber}
-                      onChange={(e) => updateChild('daughters', index, 'contactNumber', e.target.value)}
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Date of Birth / जन्म तारीख</Label>
-                    <Input
-                      type="date"
-                      value={daughter.dateOfBirth}
-                      onChange={(e) => {
-                        const date = e.target.value;
-                        const age = date ? calculateAge(date) : 0;
-                        updateChild('daughters', index, 'dateOfBirth', date);
-                        updateChild('daughters', index, 'age', age);
-                      }}
-                    />
-                    {daughter.age > 0 && (
-                      <div className="text-sm text-gray-600 mt-1">Age: {daughter.age}</div>
-                    )}
-                  </div>
-                  <div>
-                    <Label>Occupation / व्यवसाय</Label>
-                    <Select 
-                      value={daughter.occupation} 
-                      onValueChange={(value) => updateChild('daughters', index, 'occupation', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="housewife">Housewife / गृहिणी</SelectItem>
-                        <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                        <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                        <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                        <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Current Place / सध्याचे ठिकाण</Label>
-                    <Input
-                      value={daughter.currentPlace}
-                      onChange={(e) => updateChild('daughters', index, 'currentPlace', e.target.value.toUpperCase())}
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Phone Number / फोन नंबर</Label>
-                    <Input
-                      value={daughter.phoneNumber}
-                      onChange={(e) => updateChild('daughters', index, 'phoneNumber', e.target.value)}
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <Label>Marital Status / वैवाहिक स्थिती</Label>
-                    <Select 
-                      value={daughter.maritalStatus} 
-                      onValueChange={(value) => updateChild('daughters', index, 'maritalStatus', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select marital status / वैवाहिक स्थिती निवडा" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single / अविवाहित</SelectItem>
-                        <SelectItem value="married">Married / विवाहित</SelectItem>
-                        <SelectItem value="divorced">Divorced / घटस्फोटित</SelectItem>
-                        <SelectItem value="widowed">Widowed / विधवा</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Daughter's Spouse Section */}
-                {daughter.maritalStatus === 'married' && (
-                  <div className="mt-6 border-t pt-4">
-                    <h4 className="text-md font-medium mb-4">Husband Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>First Name / पहिले नाव</Label>
-                        <Input
-                          value={daughter.spouse?.firstName || ''}
-                          onChange={(e) => updateChildSpouse('daughters', index, 'firstName', e.target.value.toUpperCase())}
-                          placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Last Name / आडनाव</Label>
-                        <Input
-                          value={daughter.spouse?.lastName || ''}
-                          onChange={(e) => updateChildSpouse('daughters', index, 'lastName', e.target.value.toUpperCase())}
-                          placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Contact Number / संपर्क क्रमांक</Label>
-                        <Input
-                          value={daughter.spouse?.contactNumber || ''}
-                          onChange={(e) => updateChildSpouse('daughters', index, 'contactNumber', e.target.value)}
-                          placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Native Place / मूळ गाव</Label>
-                        <Input
-                          value={daughter.spouse?.nativePlace || ''}
-                          onChange={(e) => updateChildSpouse('daughters', index, 'nativePlace', e.target.value.toUpperCase())}
-                          placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-                        />
-                      </div>
-                      <div>
-                        <Label>Date of Birth / जन्म तारीख</Label>
-                        <Input
-                          type="date"
-                          value={daughter.spouse?.dateOfBirth || ''}
-                          onChange={(e) => {
-                            const date = e.target.value;
-                            const age = date ? calculateAge(date) : 0;
-                            updateChildSpouse('daughters', index, 'dateOfBirth', date);
-                            updateChildSpouse('daughters', index, 'age', age);
-                          }}
-                        />
-                        {daughter.spouse?.age > 0 && (
-                          <div className="text-sm text-gray-600 mt-1">Age: {daughter.spouse.age}</div>
-                        )}
-                      </div>
-                      <div>
-                        <Label>Occupation / व्यवसाय</Label>
-                        <Select 
-                          value={daughter.spouse?.occupation || ''} 
-                          onValueChange={(value) => updateChildSpouse('daughters', index, 'occupation', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                            <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                            <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                            <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Number of Children / मुलांची संख्या</Label>
-                        <Select 
-                          value={String(daughter.spouse?.numberOfChildren || 0)} 
-                          onValueChange={(value) => {
-                            const count = parseInt(value);
-                            updateChildSpouse('daughters', index, 'numberOfChildren', count);
-                            generateGrandchildForms('daughters', index, count);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select number of children / मुलांची संख्या निवडा" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[0, 1, 2, 3, 4, 5].map(num => (
-                              <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Grandchildren Section */}
-                    {daughter.spouse?.numberOfChildren > 0 && (
-                      <div className="mt-6 border-t pt-4">
-                        <h5 className="text-md font-medium mb-4">Grandchildren / नातवंडे</h5>
-                        {daughter.spouse.grandchildren.map((grandchild, gIndex) => (
-                          <div key={gIndex} className="mb-6 p-3 bg-gray-50 rounded-lg">
-                            <h6 className="text-sm font-medium mb-3">Grandchild {gIndex + 1}</h6>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div>
-                                <Label>First Name / पहिले नाव</Label>
-                                <Input
-                                  value={grandchild.firstName}
-                                  onChange={(e) => updateGrandchild('daughters', index, gIndex, 'firstName', e.target.value.toUpperCase())}
-                                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Last Name / आडनाव</Label>
-                                <Input
-                                  value={grandchild.lastName}
-                                  onChange={(e) => updateGrandchild('daughters', index, gIndex, 'lastName', e.target.value.toUpperCase())}
-                                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Contact Number / संपर्क क्रमांक</Label>
-                                <Input
-                                  value={grandchild.contactNumber}
-                                  onChange={(e) => updateGrandchild('daughters', index, gIndex, 'contactNumber', e.target.value)}
-                                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Date of Birth / जन्म तारीख</Label>
-                                <Input
-                                  type="date"
-                                  value={grandchild.dateOfBirth}
-                                  onChange={(e) => {
-                                    const date = e.target.value;
-                                    const age = date ? calculateAge(date) : 0;
-                                    updateGrandchild('daughters', index, gIndex, 'dateOfBirth', date);
-                                    updateGrandchild('daughters', index, gIndex, 'age', age);
-                                  }}
-                                />
-                                {grandchild.age > 0 && (
-                                  <div className="text-sm text-gray-600 mt-1">Age: {grandchild.age}</div>
-                                )}
-                              </div>
-                              <div>
-                                <Label>Occupation / व्यवसाय</Label>
-                                <Select 
-                                  value={grandchild.occupation} 
-                                  onValueChange={(value) => updateGrandchild('daughters', index, gIndex, 'occupation', value)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select occupation / व्यवसाय निवडा" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="salaried">Salaried / नोकरदार</SelectItem>
-                                    <SelectItem value="business">Business / व्यवसाय</SelectItem>
-                                    <SelectItem value="student">Student / विद्यार्थी</SelectItem>
-                                    <SelectItem value="unemployed">Unemployed / बेरोजगार</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label>Current Place / सध्याचे ठिकाण</Label>
-                                <Input
-                                  value={grandchild.currentPlace}
-                                  onChange={(e) => updateGrandchild('daughters', index, gIndex, 'currentPlace', e.target.value.toUpperCase())}
-                                  placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                                />
-                              </div>
-                              <div>
-                                <Label>Phone Number / फोन नंबर</Label>
-                                <Input
-                                  value={grandchild.phoneNumber}
-                                  onChange={(e) => updateGrandchild('daughters', index, gIndex, 'phoneNumber', e.target.value)}
-                                  placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Submit Button */}
-      <div className="flex justify-center pt-6">
-        <Button onClick={submitForm} size="lg" className="px-8">
-          Submit Family Information / कुटुंब माहिती सादर करा
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-export default FamilyForm;
+// Start the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', init);
