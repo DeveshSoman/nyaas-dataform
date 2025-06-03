@@ -14,31 +14,45 @@ let familyData = {
 function calculateAge(birthDate) {
   if (!birthDate) return '';
   
+  // Handle dd/mm/yyyy format
+  let date;
+  if (birthDate.includes('/')) {
+    const [day, month, year] = birthDate.split('/');
+    date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  } else {
+    date = new Date(birthDate);
+  }
+  
   const today = new Date();
-  const birth = new Date(birthDate);
+  let age = today.getFullYear() - date.getFullYear();
+  const monthDiff = today.getMonth() - date.getMonth();
   
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
     age--;
   }
   
   return age;
 }
 
+function convertDateFormat(dateString) {
+  if (!dateString) return null;
+  
+  // If it's already in yyyy-mm-dd format, return as is
+  if (dateString.includes('-')) {
+    return dateString;
+  }
+  
+  // Convert dd/mm/yyyy to yyyy-mm-dd
+  if (dateString.includes('/')) {
+    const [day, month, year] = dateString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  return dateString;
+}
+
 function showToast(title, message) {
-  const toast = document.getElementById('toast');
-  const toastTitle = document.getElementById('toastTitle');
-  const toastMessage = document.getElementById('toastMessage');
-  
-  toastTitle.textContent = title;
-  toastMessage.textContent = message;
-  toast.style.display = 'block';
-  
-  setTimeout(() => {
-    toast.style.display = 'none';
-  }, 3000);
+  toast(title, { description: message });
 }
 
 function validateContactNumber(number) {
@@ -47,168 +61,234 @@ function validateContactNumber(number) {
 
 function updateDisplayName(firstName, lastName, titleElementId) {
   const titleElement = document.getElementById(titleElementId);
-  const baseTitle = titleElement.textContent.split(' (')[0];
-  
-  if (firstName || lastName) {
-    const displayName = `${firstName} ${lastName}`.trim();
-    titleElement.textContent = `${baseTitle} (${displayName})`;
-  } else {
-    titleElement.textContent = baseTitle;
+  if (titleElement) {
+    const baseTitle = titleElement.textContent.split(' (')[0];
+    
+    if (firstName || lastName) {
+      const displayName = `${firstName} ${lastName}`.trim();
+      titleElement.textContent = `${baseTitle} (${displayName})`;
+    } else {
+      titleElement.textContent = baseTitle;
+    }
   }
 }
 
 // Event listeners for Family Head
 function setupFamilyHeadEvents() {
-  const firstNameInput = document.getElementById('headFirstName');
-  const lastNameInput = document.getElementById('headLastName');
-  const dateInput = document.getElementById('headDateOfBirth');
-  const nativeInput = document.getElementById('headNativePlace');
-  const currentInput = document.getElementById('headCurrentPlace');
-  const contactInput = document.getElementById('headContactNumber');
-  const maritalSelect = document.getElementById('headMaritalStatus');
-  const occupationSelect = document.getElementById('headOccupation');
+  const firstNameInput = document.getElementById('headFirstName') as HTMLInputElement;
+  const lastNameInput = document.getElementById('headLastName') as HTMLInputElement;
+  const dateInput = document.getElementById('headDateOfBirth') as HTMLInputElement;
+  const nativeInput = document.getElementById('headNativePlace') as HTMLInputElement;
+  const currentInput = document.getElementById('headCurrentPlace') as HTMLInputElement;
+  const contactInput = document.getElementById('headContactNumber') as HTMLInputElement;
+  const maritalSelect = document.getElementById('headMaritalStatus') as HTMLSelectElement;
+  const occupationSelect = document.getElementById('headOccupation') as HTMLSelectElement;
 
-  // Convert to uppercase and update display
-  firstNameInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.familyHead.firstName = this.value;
-    updateDisplayName(this.value, lastNameInput.value, 'familyHeadTitle');
-  });
+  if (firstNameInput) {
+    firstNameInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.familyHead.firstName = this.value;
+      updateDisplayName(this.value, lastNameInput?.value || '', 'familyHeadTitle');
+    });
+  }
 
-  lastNameInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.familyHead.lastName = this.value;
-    updateDisplayName(firstNameInput.value, this.value, 'familyHeadTitle');
-  });
+  if (lastNameInput) {
+    lastNameInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.familyHead.lastName = this.value;
+      updateDisplayName(firstNameInput?.value || '', this.value, 'familyHeadTitle');
+    });
+  }
 
-  nativeInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.familyHead.nativePlace = this.value;
-  });
+  if (nativeInput) {
+    nativeInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.familyHead.nativePlace = this.value;
+    });
+  }
 
-  currentInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.familyHead.currentPlace = this.value;
-  });
+  if (currentInput) {
+    currentInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.familyHead.currentPlace = this.value;
+    });
+  }
 
-  contactInput.addEventListener('input', function() {
-    familyData.familyHead.contactNumber = this.value;
-    const errorElement = document.getElementById('headContactNumberError');
-    if (this.value && !validateContactNumber(this.value)) {
-      errorElement.textContent = 'Contact number must contain only numbers';
-      errorElement.classList.add('show');
-    } else {
-      errorElement.classList.remove('show');
-    }
-  });
+  if (contactInput) {
+    contactInput.addEventListener('input', function() {
+      familyData.familyHead.contactNumber = this.value;
+      const errorElement = document.getElementById('headContactNumberError');
+      if (this.value && !validateContactNumber(this.value)) {
+        if (errorElement) {
+          errorElement.textContent = 'Contact number must contain only numbers';
+          errorElement.classList.add('show');
+        }
+      } else {
+        if (errorElement) {
+          errorElement.classList.remove('show');
+        }
+      }
+    });
+  }
 
-  dateInput.addEventListener('change', function() {
-    familyData.familyHead.dateOfBirth = this.value;
-    const ageElement = document.getElementById('headAge');
-    if (this.value) {
-      ageElement.textContent = `Age: ${calculateAge(this.value)}`;
-    } else {
-      ageElement.textContent = '';
-    }
-  });
+  if (dateInput) {
+    dateInput.addEventListener('change', function() {
+      familyData.familyHead.dateOfBirth = this.value;
+      const ageElement = document.getElementById('headAge');
+      if (this.value) {
+        const age = calculateAge(this.value);
+        if (ageElement) {
+          ageElement.textContent = `Age: ${age}`;
+        }
+      } else {
+        if (ageElement) {
+          ageElement.textContent = '';
+        }
+      }
+    });
+  }
 
-  maritalSelect.addEventListener('change', function() {
-    familyData.familyHead.maritalStatus = this.value;
-    const spouseSection = document.getElementById('spouseSection');
-    if (this.value === 'married') {
-      spouseSection.style.display = 'block';
-    } else {
-      spouseSection.style.display = 'none';
-      // Reset spouse data
-      familyData.spouse = {};
-      resetSpouseForm();
-    }
-  });
+  if (maritalSelect) {
+    maritalSelect.addEventListener('change', function() {
+      familyData.familyHead.maritalStatus = this.value;
+      const spouseSection = document.getElementById('spouseSection');
+      if (this.value === 'married') {
+        if (spouseSection) {
+          spouseSection.style.display = 'block';
+        }
+      } else {
+        if (spouseSection) {
+          spouseSection.style.display = 'none';
+        }
+        // Reset spouse data
+        familyData.spouse = {};
+        resetSpouseForm();
+      }
+    });
+  }
 
-  occupationSelect.addEventListener('change', function() {
-    familyData.familyHead.occupation = this.value;
-  });
+  if (occupationSelect) {
+    occupationSelect.addEventListener('change', function() {
+      familyData.familyHead.occupation = this.value;
+    });
+  }
 }
 
 // Event listeners for Spouse
 function setupSpouseEvents() {
-  const firstNameInput = document.getElementById('spouseFirstName');
-  const lastNameInput = document.getElementById('spouseLastName');
-  const dateInput = document.getElementById('spouseDateOfBirth');
-  const nativeInput = document.getElementById('spouseNativePlace');
-  const contactInput = document.getElementById('spouseContactNumber');
-  const occupationSelect = document.getElementById('spouseOccupation');
-  const sonsSelect = document.getElementById('numberOfSons');
-  const daughtersSelect = document.getElementById('numberOfDaughters');
+  const firstNameInput = document.getElementById('spouseFirstName') as HTMLInputElement;
+  const lastNameInput = document.getElementById('spouseLastName') as HTMLInputElement;
+  const dateInput = document.getElementById('spouseDateOfBirth') as HTMLInputElement;
+  const nativeInput = document.getElementById('spouseNativePlace') as HTMLInputElement;
+  const contactInput = document.getElementById('spouseContactNumber') as HTMLInputElement;
+  const occupationSelect = document.getElementById('spouseOccupation') as HTMLSelectElement;
+  const sonsSelect = document.getElementById('numberOfSons') as HTMLSelectElement;
+  const daughtersSelect = document.getElementById('numberOfDaughters') as HTMLSelectElement;
 
-  firstNameInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.spouse.firstName = this.value;
-    updateDisplayName(this.value, lastNameInput.value, 'spouseTitle');
-  });
+  if (firstNameInput) {
+    firstNameInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.spouse.firstName = this.value;
+      updateDisplayName(this.value, lastNameInput?.value || '', 'spouseTitle');
+    });
+  }
 
-  lastNameInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.spouse.lastName = this.value;
-    updateDisplayName(firstNameInput.value, this.value, 'spouseTitle');
-  });
+  if (lastNameInput) {
+    lastNameInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.spouse.lastName = this.value;
+      updateDisplayName(firstNameInput?.value || '', this.value, 'spouseTitle');
+    });
+  }
 
-  nativeInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-    familyData.spouse.nativePlace = this.value;
-  });
+  if (nativeInput) {
+    nativeInput.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+      familyData.spouse.nativePlace = this.value;
+    });
+  }
 
-  contactInput.addEventListener('input', function() {
-    familyData.spouse.contactNumber = this.value;
-    const errorElement = document.getElementById('spouseContactNumberError');
-    if (this.value && !validateContactNumber(this.value)) {
-      errorElement.textContent = 'Contact number must contain only numbers';
-      errorElement.classList.add('show');
-    } else {
-      errorElement.classList.remove('show');
-    }
-  });
+  if (contactInput) {
+    contactInput.addEventListener('input', function() {
+      familyData.spouse.contactNumber = this.value;
+      const errorElement = document.getElementById('spouseContactNumberError');
+      if (this.value && !validateContactNumber(this.value)) {
+        if (errorElement) {
+          errorElement.textContent = 'Contact number must contain only numbers';
+          errorElement.classList.add('show');
+        }
+      } else {
+        if (errorElement) {
+          errorElement.classList.remove('show');
+        }
+      }
+    });
+  }
 
-  dateInput.addEventListener('change', function() {
-    familyData.spouse.dateOfBirth = this.value;
-    const ageElement = document.getElementById('spouseAge');
-    if (this.value) {
-      ageElement.textContent = `Age: ${calculateAge(this.value)}`;
-    } else {
-      ageElement.textContent = '';
-    }
-  });
+  if (dateInput) {
+    dateInput.addEventListener('change', function() {
+      familyData.spouse.dateOfBirth = this.value;
+      const ageElement = document.getElementById('spouseAge');
+      if (this.value) {
+        const age = calculateAge(this.value);
+        if (ageElement) {
+          ageElement.textContent = `Age: ${age}`;
+        }
+      } else {
+        if (ageElement) {
+          ageElement.textContent = '';
+        }
+      }
+    });
+  }
 
-  occupationSelect.addEventListener('change', function() {
-    familyData.spouse.occupation = this.value;
-  });
+  if (occupationSelect) {
+    occupationSelect.addEventListener('change', function() {
+      familyData.spouse.occupation = this.value;
+    });
+  }
 
-  sonsSelect.addEventListener('change', function() {
-    const numberOfSons = parseInt(this.value) || 0;
-    familyData.spouse.numberOfSons = numberOfSons;
-    generateChildrenForms('sons', numberOfSons);
-  });
+  if (sonsSelect) {
+    sonsSelect.addEventListener('change', function() {
+      const numberOfSons = parseInt(this.value) || 0;
+      familyData.spouse.numberOfSons = numberOfSons;
+      generateChildrenForms('sons', numberOfSons);
+    });
+  }
 
-  daughtersSelect.addEventListener('change', function() {
-    const numberOfDaughters = parseInt(this.value) || 0;
-    familyData.spouse.numberOfDaughters = numberOfDaughters;
-    generateChildrenForms('daughters', numberOfDaughters);
-  });
+  if (daughtersSelect) {
+    daughtersSelect.addEventListener('change', function() {
+      const numberOfDaughters = parseInt(this.value) || 0;
+      familyData.spouse.numberOfDaughters = numberOfDaughters;
+      generateChildrenForms('daughters', numberOfDaughters);
+    });
+  }
 }
 
 function resetSpouseForm() {
   const spouseInputs = ['spouseFirstName', 'spouseLastName', 'spouseContactNumber', 'spouseNativePlace', 'spouseDateOfBirth'];
   spouseInputs.forEach(id => {
-    document.getElementById(id).value = '';
+    const element = document.getElementById(id) as HTMLInputElement;
+    if (element) {
+      element.value = '';
+    }
   });
-  document.getElementById('spouseOccupation').selectedIndex = 0;
-  document.getElementById('numberOfSons').selectedIndex = 0;
-  document.getElementById('numberOfDaughters').selectedIndex = 0;
-  document.getElementById('spouseAge').textContent = '';
+  
+  const spouseOccupation = document.getElementById('spouseOccupation') as HTMLSelectElement;
+  const numberOfSons = document.getElementById('numberOfSons') as HTMLSelectElement;
+  const numberOfDaughters = document.getElementById('numberOfDaughters') as HTMLSelectElement;
+  const spouseAge = document.getElementById('spouseAge');
+  
+  if (spouseOccupation) spouseOccupation.selectedIndex = 0;
+  if (numberOfSons) numberOfSons.selectedIndex = 0;
+  if (numberOfDaughters) numberOfDaughters.selectedIndex = 0;
+  if (spouseAge) spouseAge.textContent = '';
   
   // Hide children sections
-  document.getElementById('sonsSection').style.display = 'none';
-  document.getElementById('daughtersSection').style.display = 'none';
+  const sonsSection = document.getElementById('sonsSection');
+  const daughtersSection = document.getElementById('daughtersSection');
+  if (sonsSection) sonsSection.style.display = 'none';
+  if (daughtersSection) daughtersSection.style.display = 'none';
 }
 
 // Generate children forms
@@ -631,14 +711,23 @@ function validateForm() {
 
 // Submit form
 async function submitForm() {
+  console.log('Starting form submission...');
+  console.log('Current familyData:', familyData);
+  
   const validation = validateForm();
   
   if (validation.isValid) {
     try {
-      console.log('Starting form submission...');
-      
       // Calculate age for family head
       const headAge = calculateAge(familyData.familyHead.dateOfBirth);
+      const convertedHeadDate = convertDateFormat(familyData.familyHead.dateOfBirth);
+      
+      console.log('Inserting family head with data:', {
+        first_name: familyData.familyHead.firstName,
+        last_name: familyData.familyHead.lastName,
+        date_of_birth: convertedHeadDate,
+        age: headAge
+      });
       
       // Insert family head
       const { data: familyHeadData, error: familyHeadError } = await supabase
@@ -646,7 +735,7 @@ async function submitForm() {
         .insert({
           first_name: familyData.familyHead.firstName,
           last_name: familyData.familyHead.lastName,
-          date_of_birth: familyData.familyHead.dateOfBirth,
+          date_of_birth: convertedHeadDate,
           age: headAge,
           native_place: familyData.familyHead.nativePlace || null,
           current_place: familyData.familyHead.currentPlace || null,
@@ -669,6 +758,7 @@ async function submitForm() {
       let spouseId = null;
       if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
         const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
+        const convertedSpouseDate = convertDateFormat(familyData.spouse.dateOfBirth);
         
         const { data: spouseData, error: spouseError } = await supabase
           .from('spouses')
@@ -676,7 +766,7 @@ async function submitForm() {
             family_head_id: familyHeadId,
             first_name: familyData.spouse.firstName || null,
             last_name: familyData.spouse.lastName || null,
-            date_of_birth: familyData.spouse.dateOfBirth || null,
+            date_of_birth: convertedSpouseDate,
             age: spouseAge,
             native_place: familyData.spouse.nativePlace || null,
             contact_number: familyData.spouse.contactNumber || null,
@@ -702,6 +792,7 @@ async function submitForm() {
         if (!son.firstName && !son.lastName) continue;
 
         const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
+        const convertedSonDate = convertDateFormat(son.dateOfBirth);
         
         const { data: sonData, error: sonError } = await supabase
           .from('children')
@@ -710,7 +801,7 @@ async function submitForm() {
             first_name: son.firstName || null,
             last_name: son.lastName || null,
             contact_number: son.contactNumber || null,
-            date_of_birth: son.dateOfBirth || null,
+            date_of_birth: convertedSonDate,
             age: sonAge,
             occupation: son.occupation || null,
             current_place: son.currentPlace || null,
@@ -732,6 +823,7 @@ async function submitForm() {
         // Insert son's spouse if married
         if (son.maritalStatus === 'married' && son.spouse) {
           const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
+          const convertedSonSpouseDate = convertDateFormat(son.spouse.dateOfBirth);
           
           const { data: sonSpouseData, error: sonSpouseError } = await supabase
             .from('child_spouses')
@@ -741,7 +833,7 @@ async function submitForm() {
               last_name: son.spouse.lastName || null,
               contact_number: son.spouse.contactNumber || null,
               native_place: son.spouse.nativePlace || null,
-              date_of_birth: son.spouse.dateOfBirth || null,
+              date_of_birth: convertedSonSpouseDate,
               age: sonSpouseAge,
               occupation: son.spouse.occupation || null,
               number_of_children: son.spouse.numberOfChildren || 0
@@ -763,6 +855,7 @@ async function submitForm() {
               if (!grandchild.firstName && !grandchild.lastName) continue;
 
               const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+              const convertedGrandchildDate = convertDateFormat(grandchild.dateOfBirth);
               
               const { error: grandchildError } = await supabase
                 .from('grandchildren')
@@ -771,7 +864,7 @@ async function submitForm() {
                   first_name: grandchild.firstName || null,
                   last_name: grandchild.lastName || null,
                   contact_number: grandchild.contactNumber || null,
-                  date_of_birth: grandchild.dateOfBirth || null,
+                  date_of_birth: convertedGrandchildDate,
                   age: grandchildAge,
                   occupation: grandchild.occupation || null,
                   current_place: grandchild.currentPlace || null,
@@ -794,6 +887,7 @@ async function submitForm() {
         if (!daughter.firstName && !daughter.lastName) continue;
 
         const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
+        const convertedDaughterDate = convertDateFormat(daughter.dateOfBirth);
         
         const { data: daughterData, error: daughterError } = await supabase
           .from('children')
@@ -802,7 +896,7 @@ async function submitForm() {
             first_name: daughter.firstName || null,
             last_name: daughter.lastName || null,
             contact_number: daughter.contactNumber || null,
-            date_of_birth: daughter.dateOfBirth || null,
+            date_of_birth: convertedDaughterDate,
             age: daughterAge,
             occupation: daughter.occupation || null,
             current_place: daughter.currentPlace || null,
@@ -824,6 +918,7 @@ async function submitForm() {
         // Insert daughter's spouse if married
         if (daughter.maritalStatus === 'married' && daughter.spouse) {
           const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
+          const convertedDaughterSpouseDate = convertDateFormat(daughter.spouse.dateOfBirth);
           
           const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
             .from('child_spouses')
@@ -833,7 +928,7 @@ async function submitForm() {
               last_name: daughter.spouse.lastName || null,
               contact_number: daughter.spouse.contactNumber || null,
               native_place: daughter.spouse.nativePlace || null,
-              date_of_birth: daughter.spouse.dateOfBirth || null,
+              date_of_birth: convertedDaughterSpouseDate,
               age: daughterSpouseAge,
               occupation: daughter.spouse.occupation || null,
               number_of_children: daughter.spouse.numberOfChildren || 0
@@ -855,6 +950,7 @@ async function submitForm() {
               if (!grandchild.firstName && !grandchild.lastName) continue;
 
               const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+              const convertedGrandchildDate = convertDateFormat(grandchild.dateOfBirth);
               
               const { error: grandchildError } = await supabase
                 .from('grandchildren')
@@ -863,7 +959,7 @@ async function submitForm() {
                   first_name: grandchild.firstName || null,
                   last_name: grandchild.lastName || null,
                   contact_number: grandchild.contactNumber || null,
-                  date_of_birth: grandchild.dateOfBirth || null,
+                  date_of_birth: convertedGrandchildDate,
                   age: grandchildAge,
                   occupation: grandchild.occupation || null,
                   current_place: grandchild.currentPlace || null,
@@ -880,12 +976,12 @@ async function submitForm() {
         }
       }
 
-      showToast('Form Submitted Successfully!', 'Family information has been saved.');
+      showToast('Success!', 'Family information has been saved successfully.');
       console.log('Form submission completed successfully');
       
     } catch (error) {
       console.error('Form submission error:', error);
-      showToast('Error', 'Failed to save family information. Please try again.');
+      showToast('Error', `Failed to save family information: ${error.message}`);
     }
   } else {
     showToast('Validation Error', validation.errors.join(', '));
@@ -898,10 +994,19 @@ function init() {
   setupSpouseEvents();
   
   // Submit button event
-  document.getElementById('submitBtn').addEventListener('click', submitForm);
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', submitForm);
+  }
   
   console.log('Family form initialized');
 }
 
 // Start the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
+
+const FamilyForm = () => {
+  return <div>Family Form Component</div>;
+};
+
+export default FamilyForm;
