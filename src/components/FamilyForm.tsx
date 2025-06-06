@@ -2,17 +2,81 @@ import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Global variables
-let familyData = {
-  familyHead: {},
-  spouse: {},
+// Type definitions
+interface PersonData {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  nativePlace: string;
+  currentPlace: string;
+  contactNumber: string;
+  maritalStatus: string;
+  occupation: string;
+  numberOfSons?: number;
+  numberOfDaughters?: number;
+  phoneNumber?: string;
+  spouse?: SpouseData | null;
+}
+
+interface SpouseData {
+  firstName: string;
+  lastName: string;
+  contactNumber: string;
+  nativePlace: string;
+  dateOfBirth: string;
+  occupation: string;
+  numberOfChildren: number;
+  grandchildren: GrandchildData[];
+}
+
+interface GrandchildData {
+  firstName: string;
+  lastName: string;
+  contactNumber: string;
+  dateOfBirth: string;
+  occupation: string;
+  currentPlace: string;
+  phoneNumber: string;
+}
+
+interface FamilyData {
+  familyHead: PersonData;
+  spouse: PersonData;
+  sons: PersonData[];
+  daughters: PersonData[];
+}
+
+// Global variables with proper initialization
+let familyData: FamilyData = {
+  familyHead: {
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
+    nativePlace: '',
+    currentPlace: '',
+    contactNumber: '',
+    maritalStatus: '',
+    occupation: ''
+  },
+  spouse: {
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
+    nativePlace: '',
+    currentPlace: '',
+    contactNumber: '',
+    maritalStatus: '',
+    occupation: '',
+    numberOfSons: 0,
+    numberOfDaughters: 0
+  },
   sons: [],
   daughters: []
 };
 
 // Utility functions
-function calculateAge(birthDate) {
-  if (!birthDate) return '';
+function calculateAge(birthDate: string): number {
+  if (!birthDate) return 0;
   
   const today = new Date();
   const birth = new Date(birthDate);
@@ -27,18 +91,18 @@ function calculateAge(birthDate) {
   return age;
 }
 
-function showToast(title, message) {
+function showToast(title: string, message: string) {
   toast(title, { description: message });
 }
 
-function validateContactNumber(number) {
+function validateContactNumber(number: string): boolean {
   return /^\d+$/.test(number);
 }
 
-function updateDisplayName(firstName, lastName, titleElementId) {
+function updateDisplayName(firstName: string, lastName: string, titleElementId: string) {
   const titleElement = document.getElementById(titleElementId);
   if (titleElement) {
-    const baseTitle = titleElement.textContent.split(' (')[0];
+    const baseTitle = titleElement.textContent?.split(' (')[0] || '';
     
     if (firstName || lastName) {
       const displayName = `${firstName} ${lastName}`.trim();
@@ -137,7 +201,18 @@ function setupFamilyHeadEvents() {
           spouseSection.style.display = 'none';
         }
         // Reset spouse data
-        familyData.spouse = {};
+        familyData.spouse = {
+          firstName: '',
+          lastName: '',
+          dateOfBirth: '',
+          nativePlace: '',
+          currentPlace: '',
+          contactNumber: '',
+          maritalStatus: '',
+          occupation: '',
+          numberOfSons: 0,
+          numberOfDaughters: 0
+        };
         resetSpouseForm();
       }
     });
@@ -268,7 +343,7 @@ function resetSpouseForm() {
 }
 
 // Generate children forms
-function generateChildrenForms(type, count) {
+function generateChildrenForms(type: 'sons' | 'daughters', count: number) {
   const container = document.getElementById(type === 'sons' ? 'sonsContainer' : 'daughtersContainer');
   const section = document.getElementById(type === 'sons' ? 'sonsSection' : 'daughtersSection');
   
@@ -281,7 +356,7 @@ function generateChildrenForms(type, count) {
     familyData[type] = [];
     
     for (let i = 0; i < count; i++) {
-      const childData = {
+      const childData: PersonData = {
         firstName: '',
         lastName: '',
         contactNumber: '',
@@ -290,6 +365,7 @@ function generateChildrenForms(type, count) {
         currentPlace: '',
         phoneNumber: '',
         maritalStatus: '',
+        nativePlace: '',
         spouse: null
       };
       
@@ -304,7 +380,7 @@ function generateChildrenForms(type, count) {
   }
 }
 
-function createChildForm(childData, index, type) {
+function createChildForm(childData: PersonData, index: number, type: 'sons' | 'daughters'): HTMLElement {
   const div = document.createElement('div');
   div.className = 'child-form';
   div.innerHTML = `
@@ -364,22 +440,22 @@ function createChildForm(childData, index, type) {
   return div;
 }
 
-function setupChildEventListeners(container, index, type) {
+function setupChildEventListeners(container: HTMLElement, index: number, type: 'sons' | 'daughters') {
   const inputs = container.querySelectorAll('.child-input');
   
   inputs.forEach(input => {
     input.addEventListener('input', function() {
-      updateChildData(this, index, type);
+      updateChildData(this as HTMLInputElement, index, type);
     });
     
     input.addEventListener('change', function() {
-      updateChildData(this, index, type);
+      updateChildData(this as HTMLInputElement, index, type);
     });
   });
 }
 
-function updateChildData(input, index, type) {
-  const field = input.dataset.field;
+function updateChildData(input: HTMLInputElement, index: number, type: 'sons' | 'daughters') {
+  const field = input.dataset.field as keyof PersonData;
   let value = input.value;
   
   // Convert text inputs to uppercase
@@ -388,7 +464,7 @@ function updateChildData(input, index, type) {
     input.value = value;
   }
   
-  familyData[type][index][field] = value;
+  (familyData[type][index] as any)[field] = value;
   
   // Handle age calculation for date of birth
   if (field === 'dateOfBirth') {
@@ -421,7 +497,7 @@ function updateChildData(input, index, type) {
   }
 }
 
-function createSpouseForm(container, childIndex, childType) {
+function createSpouseForm(container: HTMLElement, childIndex: number, childType: 'sons' | 'daughters') {
   if (!familyData[childType][childIndex].spouse) {
     familyData[childType][childIndex].spouse = {
       firstName: '',
@@ -496,43 +572,45 @@ function createSpouseForm(container, childIndex, childType) {
   setupSpouseEventListeners(container, childIndex, childType);
 }
 
-function setupSpouseEventListeners(container, childIndex, childType) {
+function setupSpouseEventListeners(container: HTMLElement, childIndex: number, childType: 'sons' | 'daughters') {
   const inputs = container.querySelectorAll('.spouse-input');
   
   inputs.forEach(input => {
     input.addEventListener('input', function() {
-      updateSpouseData(this, childIndex, childType);
+      updateSpouseData(this as HTMLInputElement, childIndex, childType);
     });
     
     input.addEventListener('change', function() {
-      updateSpouseData(this, childIndex, childType);
+      updateSpouseData(this as HTMLInputElement, childIndex, childType);
     });
   });
 }
 
-function updateSpouseData(input, childIndex, childType) {
-  const field = input.dataset.field;
-  let value = input.value;
+function updateSpouseData(input: HTMLInputElement, childIndex: number, childType: 'sons' | 'daughters') {
+  const field = input.dataset.field as keyof SpouseData;
+  let value: string | number = input.value;
   
   // Convert text inputs to uppercase
   if (input.type === 'text') {
     value = value.toUpperCase();
-    input.value = value;
+    input.value = value as string;
   }
   
   // Handle number of children
   if (field === 'numberOfChildren') {
-    value = parseInt(value) || 0;
+    value = parseInt(value as string) || 0;
   }
   
-  familyData[childType][childIndex].spouse[field] = value;
+  if (familyData[childType][childIndex].spouse) {
+    (familyData[childType][childIndex].spouse as any)[field] = value;
+  }
   
   // Handle age calculation for date of birth
   if (field === 'dateOfBirth') {
     const ageElement = document.getElementById(`${childType}SpouseAge${childIndex}`);
     if (value) {
       if (ageElement) {
-        ageElement.textContent = `Age: ${calculateAge(value)}`;
+        ageElement.textContent = `Age: ${calculateAge(value as string)}`;
       }
     } else {
       if (ageElement) {
@@ -544,27 +622,31 @@ function updateSpouseData(input, childIndex, childType) {
   // Handle number of children change
   if (field === 'numberOfChildren') {
     const grandchildrenContainer = document.getElementById(`${childType}Grandchildren${childIndex}`);
-    if (value > 0) {
+    if ((value as number) > 0) {
       if (grandchildrenContainer) {
         grandchildrenContainer.style.display = 'block';
-        createGrandchildrenForms(grandchildrenContainer, value, childIndex, childType);
+        createGrandchildrenForms(grandchildrenContainer, value as number, childIndex, childType);
       }
     } else {
       if (grandchildrenContainer) {
         grandchildrenContainer.style.display = 'none';
       }
-      familyData[childType][childIndex].spouse.grandchildren = [];
+      if (familyData[childType][childIndex].spouse) {
+        familyData[childType][childIndex].spouse!.grandchildren = [];
+      }
     }
   }
 }
 
-function createGrandchildrenForms(container, count, childIndex, childType) {
-  familyData[childType][childIndex].spouse.grandchildren = [];
+function createGrandchildrenForms(container: HTMLElement, count: number, childIndex: number, childType: 'sons' | 'daughters') {
+  if (familyData[childType][childIndex].spouse) {
+    familyData[childType][childIndex].spouse!.grandchildren = [];
+  }
   
   container.innerHTML = '<h5>Grandchildren / नातवंडे</h5>';
   
   for (let i = 0; i < count; i++) {
-    const grandchildData = {
+    const grandchildData: GrandchildData = {
       firstName: '',
       lastName: '',
       contactNumber: '',
@@ -574,14 +656,16 @@ function createGrandchildrenForms(container, count, childIndex, childType) {
       phoneNumber: ''
     };
     
-    familyData[childType][childIndex].spouse.grandchildren.push(grandchildData);
+    if (familyData[childType][childIndex].spouse) {
+      familyData[childType][childIndex].spouse!.grandchildren.push(grandchildData);
+    }
     
     const grandchildForm = createGrandchildForm(grandchildData, i, childIndex, childType);
     container.appendChild(grandchildForm);
   }
 }
 
-function createGrandchildForm(grandchildData, grandchildIndex, childIndex, childType) {
+function createGrandchildForm(grandchildData: GrandchildData, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters'): HTMLElement {
   const div = document.createElement('div');
   div.className = 'grandchild-form';
   div.innerHTML = `
@@ -629,22 +713,22 @@ function createGrandchildForm(grandchildData, grandchildIndex, childIndex, child
   return div;
 }
 
-function setupGrandchildEventListeners(container, grandchildIndex, childIndex, childType) {
+function setupGrandchildEventListeners(container: HTMLElement, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters') {
   const inputs = container.querySelectorAll('.grandchild-input');
   
   inputs.forEach(input => {
     input.addEventListener('input', function() {
-      updateGrandchildData(this, grandchildIndex, childIndex, childType);
+      updateGrandchildData(this as HTMLInputElement, grandchildIndex, childIndex, childType);
     });
     
     input.addEventListener('change', function() {
-      updateGrandchildData(this, grandchildIndex, childIndex, childType);
+      updateGrandchildData(this as HTMLInputElement, grandchildIndex, childIndex, childType);
     });
   });
 }
 
-function updateGrandchildData(input, grandchildIndex, childIndex, childType) {
-  const field = input.dataset.field;
+function updateGrandchildData(input: HTMLInputElement, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters') {
+  const field = input.dataset.field as keyof GrandchildData;
   let value = input.value;
   
   // Convert text inputs to uppercase
@@ -653,7 +737,9 @@ function updateGrandchildData(input, grandchildIndex, childIndex, childType) {
     input.value = value;
   }
   
-  familyData[childType][childIndex].spouse.grandchildren[grandchildIndex][field] = value;
+  if (familyData[childType][childIndex].spouse) {
+    (familyData[childType][childIndex].spouse!.grandchildren[grandchildIndex] as any)[field] = value;
+  }
   
   // Handle age calculation for date of birth
   if (field === 'dateOfBirth') {
@@ -673,7 +759,7 @@ function updateGrandchildData(input, grandchildIndex, childIndex, childType) {
 // Form validation
 function validateForm() {
   let isValid = true;
-  const errors = [];
+  const errors: string[] = [];
   
   // Validate family head
   if (!familyData.familyHead.firstName) {
@@ -732,8 +818,8 @@ async function submitForm() {
           native_place: familyData.familyHead.nativePlace || null,
           current_place: familyData.familyHead.currentPlace || null,
           contact_number: familyData.familyHead.contactNumber || null,
-          marital_status: familyData.familyHead.maritalStatus,
-          occupation: familyData.familyHead.occupation || null
+          marital_status: familyData.familyHead.maritalStatus as any,
+          occupation: familyData.familyHead.occupation as any || null
         })
         .select()
         .single();
@@ -758,7 +844,7 @@ async function submitForm() {
             age: spouseAge,
             native_place: familyData.spouse.nativePlace || null,
             contact_number: familyData.spouse.contactNumber || null,
-            occupation: familyData.spouse.occupation || null,
+            occupation: familyData.spouse.occupation as any || null,
             number_of_sons: familyData.spouse.numberOfSons || 0,
             number_of_daughters: familyData.spouse.numberOfDaughters || 0
           })
@@ -786,10 +872,10 @@ async function submitForm() {
             contact_number: son.contactNumber || null,
             date_of_birth: son.dateOfBirth || null,
             age: sonAge,
-            occupation: son.occupation || null,
+            occupation: son.occupation as any || null,
             current_place: son.currentPlace || null,
             phone_number: son.phoneNumber || null,
-            marital_status: son.maritalStatus || null,
+            marital_status: son.maritalStatus as any || null,
             child_type: 'son',
             child_index: i
           })
@@ -814,7 +900,7 @@ async function submitForm() {
               native_place: son.spouse.nativePlace || null,
               date_of_birth: son.spouse.dateOfBirth || null,
               age: sonSpouseAge,
-              occupation: son.spouse.occupation || null,
+              occupation: son.spouse.occupation as any || null,
               number_of_children: son.spouse.numberOfChildren || 0
             })
             .select()
@@ -841,7 +927,7 @@ async function submitForm() {
                   contact_number: grandchild.contactNumber || null,
                   date_of_birth: grandchild.dateOfBirth || null,
                   age: grandchildAge,
-                  occupation: grandchild.occupation || null,
+                  occupation: grandchild.occupation as any || null,
                   current_place: grandchild.currentPlace || null,
                   phone_number: grandchild.phoneNumber || null,
                   grandchild_index: j
@@ -871,10 +957,10 @@ async function submitForm() {
             contact_number: daughter.contactNumber || null,
             date_of_birth: daughter.dateOfBirth || null,
             age: daughterAge,
-            occupation: daughter.occupation || null,
+            occupation: daughter.occupation as any || null,
             current_place: daughter.currentPlace || null,
             phone_number: daughter.phoneNumber || null,
-            marital_status: daughter.maritalStatus || null,
+            marital_status: daughter.maritalStatus as any || null,
             child_type: 'daughter',
             child_index: i
           })
@@ -899,7 +985,7 @@ async function submitForm() {
               native_place: daughter.spouse.nativePlace || null,
               date_of_birth: daughter.spouse.dateOfBirth || null,
               age: daughterSpouseAge,
-              occupation: daughter.spouse.occupation || null,
+              occupation: daughter.spouse.occupation as any || null,
               number_of_children: daughter.spouse.numberOfChildren || 0
             })
             .select()
@@ -926,7 +1012,7 @@ async function submitForm() {
                   contact_number: grandchild.contactNumber || null,
                   date_of_birth: grandchild.dateOfBirth || null,
                   age: grandchildAge,
-                  occupation: grandchild.occupation || null,
+                  occupation: grandchild.occupation as any || null,
                   current_place: grandchild.currentPlace || null,
                   phone_number: grandchild.phoneNumber || null,
                   grandchild_index: j
@@ -941,10 +1027,11 @@ async function submitForm() {
       }
 
       showToast('Form Submitted Successfully!', 'Family information has been saved.');
+      console.log('Data successfully saved to Supabase!');
       
     } catch (error) {
       console.error('Form submission error:', error);
-      showToast('Error', `Failed to save family information: ${error.message}`);
+      showToast('Error', `Failed to save family information: ${(error as Error).message}`);
     }
   } else {
     showToast('Validation Error', validation.errors.join(', '));
