@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -99,6 +100,24 @@ function validateContactNumber(number: string): boolean {
   return /^\d+$/.test(number);
 }
 
+function formatDateForDisplay(dateString: string): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function convertDateForStorage(ddmmyyyy: string): string {
+  if (!ddmmyyyy) return '';
+  const parts = ddmmyyyy.split('/');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to YYYY-MM-DD
+  }
+  return ddmmyyyy;
+}
+
 function updateDisplayName(firstName: string, lastName: string, titleElementId: string) {
   const titleElement = document.getElementById(titleElementId);
   if (titleElement) {
@@ -115,6 +134,8 @@ function updateDisplayName(firstName: string, lastName: string, titleElementId: 
 
 // Event listeners for Family Head
 function setupFamilyHeadEvents() {
+  console.log('Setting up family head events...');
+  
   const firstNameInput = document.getElementById('headFirstName') as HTMLInputElement;
   const lastNameInput = document.getElementById('headLastName') as HTMLInputElement;
   const dateInput = document.getElementById('headDateOfBirth') as HTMLInputElement;
@@ -129,6 +150,7 @@ function setupFamilyHeadEvents() {
       this.value = this.value.toUpperCase();
       familyData.familyHead.firstName = this.value;
       updateDisplayName(this.value, lastNameInput?.value || '', 'familyHeadTitle');
+      console.log('Family head first name updated:', this.value);
     });
   }
 
@@ -137,6 +159,7 @@ function setupFamilyHeadEvents() {
       this.value = this.value.toUpperCase();
       familyData.familyHead.lastName = this.value;
       updateDisplayName(firstNameInput?.value || '', this.value, 'familyHeadTitle');
+      console.log('Family head last name updated:', this.value);
     });
   }
 
@@ -144,6 +167,7 @@ function setupFamilyHeadEvents() {
     nativeInput.addEventListener('input', function() {
       this.value = this.value.toUpperCase();
       familyData.familyHead.nativePlace = this.value;
+      console.log('Family head native place updated:', this.value);
     });
   }
 
@@ -151,6 +175,7 @@ function setupFamilyHeadEvents() {
     currentInput.addEventListener('input', function() {
       this.value = this.value.toUpperCase();
       familyData.familyHead.currentPlace = this.value;
+      console.log('Family head current place updated:', this.value);
     });
   }
 
@@ -168,6 +193,7 @@ function setupFamilyHeadEvents() {
           errorElement.classList.remove('show');
         }
       }
+      console.log('Family head contact updated:', this.value);
     });
   }
 
@@ -180,6 +206,7 @@ function setupFamilyHeadEvents() {
         if (ageElement) {
           ageElement.textContent = `Age: ${age}`;
         }
+        console.log('Family head DOB updated:', this.value, 'Age:', age);
       } else {
         if (ageElement) {
           ageElement.textContent = '';
@@ -192,6 +219,8 @@ function setupFamilyHeadEvents() {
     maritalSelect.addEventListener('change', function() {
       familyData.familyHead.maritalStatus = this.value;
       const spouseSection = document.getElementById('spouseSection');
+      console.log('Marital status changed to:', this.value);
+      
       if (this.value === 'married') {
         if (spouseSection) {
           spouseSection.style.display = 'block';
@@ -221,12 +250,15 @@ function setupFamilyHeadEvents() {
   if (occupationSelect) {
     occupationSelect.addEventListener('change', function() {
       familyData.familyHead.occupation = this.value;
+      console.log('Family head occupation updated:', this.value);
     });
   }
 }
 
 // Event listeners for Spouse
 function setupSpouseEvents() {
+  console.log('Setting up spouse events...');
+  
   const firstNameInput = document.getElementById('spouseFirstName') as HTMLInputElement;
   const lastNameInput = document.getElementById('spouseLastName') as HTMLInputElement;
   const dateInput = document.getElementById('spouseDateOfBirth') as HTMLInputElement;
@@ -303,6 +335,7 @@ function setupSpouseEvents() {
     sonsSelect.addEventListener('change', function() {
       const numberOfSons = parseInt(this.value) || 0;
       familyData.spouse.numberOfSons = numberOfSons;
+      console.log('Number of sons changed to:', numberOfSons);
       generateChildrenForms('sons', numberOfSons);
     });
   }
@@ -311,6 +344,7 @@ function setupSpouseEvents() {
     daughtersSelect.addEventListener('change', function() {
       const numberOfDaughters = parseInt(this.value) || 0;
       familyData.spouse.numberOfDaughters = numberOfDaughters;
+      console.log('Number of daughters changed to:', numberOfDaughters);
       generateChildrenForms('daughters', numberOfDaughters);
     });
   }
@@ -761,6 +795,8 @@ function validateForm() {
   let isValid = true;
   const errors: string[] = [];
   
+  console.log('Validating form with data:', familyData);
+  
   // Validate family head
   if (!familyData.familyHead.firstName) {
     errors.push('Family head first name is required');
@@ -793,268 +829,406 @@ function validateForm() {
   return { isValid, errors };
 }
 
-// Submit form
+// Submit form - THIS IS THE KEY FUNCTION FOR SAVING DATA
 async function submitForm() {
+  console.log('=== STARTING FORM SUBMISSION ===');
+  console.log('Current family data:', JSON.stringify(familyData, null, 2));
+  
   const validation = validateForm();
   
-  if (validation.isValid) {
-    try {
-      console.log('Family Head Data:', familyData.familyHead);
-      console.log('Spouse Data:', familyData.spouse);
-      console.log('Sons Data:', familyData.sons);
-      console.log('Daughters Data:', familyData.daughters);
+  if (!validation.isValid) {
+    console.log('Validation failed:', validation.errors);
+    showToast('Validation Error', validation.errors.join(', '));
+    return;
+  }
+  
+  try {
+    console.log('Starting database operations...');
+    
+    // Calculate age for family head
+    const headAge = calculateAge(familyData.familyHead.dateOfBirth);
+    console.log('Family head age calculated:', headAge);
+    
+    // Insert family head
+    console.log('Inserting family head with data:', {
+      first_name: familyData.familyHead.firstName,
+      last_name: familyData.familyHead.lastName,
+      date_of_birth: familyData.familyHead.dateOfBirth,
+      age: headAge,
+      native_place: familyData.familyHead.nativePlace || null,
+      current_place: familyData.familyHead.currentPlace || null,
+      contact_number: familyData.familyHead.contactNumber || null,
+      marital_status: familyData.familyHead.maritalStatus,
+      occupation: familyData.familyHead.occupation || null
+    });
+    
+    const { data: familyHeadData, error: familyHeadError } = await supabase
+      .from('family_heads')
+      .insert({
+        first_name: familyData.familyHead.firstName,
+        last_name: familyData.familyHead.lastName,
+        date_of_birth: familyData.familyHead.dateOfBirth,
+        age: headAge,
+        native_place: familyData.familyHead.nativePlace || null,
+        current_place: familyData.familyHead.currentPlace || null,
+        contact_number: familyData.familyHead.contactNumber || null,
+        marital_status: familyData.familyHead.maritalStatus as any,
+        occupation: familyData.familyHead.occupation as any || null
+      })
+      .select()
+      .single();
+
+    if (familyHeadError) {
+      console.error('Family head insertion error:', familyHeadError);
+      throw familyHeadError;
+    }
+
+    console.log('Family head inserted successfully:', familyHeadData);
+    const familyHeadId = familyHeadData.id;
+
+    // Insert spouse if married
+    if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
+      const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
       
-      // Calculate age for family head
-      const headAge = calculateAge(familyData.familyHead.dateOfBirth);
+      console.log('Inserting spouse with data:', {
+        family_head_id: familyHeadId,
+        first_name: familyData.spouse.firstName || null,
+        last_name: familyData.spouse.lastName || null,
+        date_of_birth: familyData.spouse.dateOfBirth || null,
+        age: spouseAge,
+        native_place: familyData.spouse.nativePlace || null,
+        contact_number: familyData.spouse.contactNumber || null,
+        occupation: familyData.spouse.occupation || null,
+        number_of_sons: familyData.spouse.numberOfSons || 0,
+        number_of_daughters: familyData.spouse.numberOfDaughters || 0
+      });
       
-      // Insert family head
-      const { data: familyHeadData, error: familyHeadError } = await supabase
-        .from('family_heads')
+      const { data: spouseData, error: spouseError } = await supabase
+        .from('spouses')
         .insert({
-          first_name: familyData.familyHead.firstName,
-          last_name: familyData.familyHead.lastName,
-          date_of_birth: familyData.familyHead.dateOfBirth,
-          age: headAge,
-          native_place: familyData.familyHead.nativePlace || null,
-          current_place: familyData.familyHead.currentPlace || null,
-          contact_number: familyData.familyHead.contactNumber || null,
-          marital_status: familyData.familyHead.maritalStatus as any,
-          occupation: familyData.familyHead.occupation as any || null
+          family_head_id: familyHeadId,
+          first_name: familyData.spouse.firstName || null,
+          last_name: familyData.spouse.lastName || null,
+          date_of_birth: familyData.spouse.dateOfBirth || null,
+          age: spouseAge,
+          native_place: familyData.spouse.nativePlace || null,
+          contact_number: familyData.spouse.contactNumber || null,
+          occupation: familyData.spouse.occupation as any || null,
+          number_of_sons: familyData.spouse.numberOfSons || 0,
+          number_of_daughters: familyData.spouse.numberOfDaughters || 0
         })
         .select()
         .single();
 
-      if (familyHeadError) {
-        throw familyHeadError;
+      if (spouseError) {
+        console.error('Spouse insertion error:', spouseError);
+        throw spouseError;
       }
-
-      const familyHeadId = familyHeadData.id;
-
-      // Insert spouse if married
-      if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
-        const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
-        
-        const { data: spouseData, error: spouseError } = await supabase
-          .from('spouses')
-          .insert({
-            family_head_id: familyHeadId,
-            first_name: familyData.spouse.firstName || null,
-            last_name: familyData.spouse.lastName || null,
-            date_of_birth: familyData.spouse.dateOfBirth || null,
-            age: spouseAge,
-            native_place: familyData.spouse.nativePlace || null,
-            contact_number: familyData.spouse.contactNumber || null,
-            occupation: familyData.spouse.occupation as any || null,
-            number_of_sons: familyData.spouse.numberOfSons || 0,
-            number_of_daughters: familyData.spouse.numberOfDaughters || 0
-          })
-          .select()
-          .single();
-
-        if (spouseError) {
-          throw spouseError;
-        }
-      }
-
-      // Insert children (sons)
-      for (let i = 0; i < familyData.sons.length; i++) {
-        const son = familyData.sons[i];
-        if (!son.firstName && !son.lastName) continue;
-
-        const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
-        
-        const { data: sonData, error: sonError } = await supabase
-          .from('children')
-          .insert({
-            family_head_id: familyHeadId,
-            first_name: son.firstName || null,
-            last_name: son.lastName || null,
-            contact_number: son.contactNumber || null,
-            date_of_birth: son.dateOfBirth || null,
-            age: sonAge,
-            occupation: son.occupation as any || null,
-            current_place: son.currentPlace || null,
-            phone_number: son.phoneNumber || null,
-            marital_status: son.maritalStatus as any || null,
-            child_type: 'son',
-            child_index: i
-          })
-          .select()
-          .single();
-
-        if (sonError) {
-          throw sonError;
-        }
-
-        // Insert son's spouse if married
-        if (son.maritalStatus === 'married' && son.spouse) {
-          const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
-          
-          const { data: sonSpouseData, error: sonSpouseError } = await supabase
-            .from('child_spouses')
-            .insert({
-              child_id: sonData.id,
-              first_name: son.spouse.firstName || null,
-              last_name: son.spouse.lastName || null,
-              contact_number: son.spouse.contactNumber || null,
-              native_place: son.spouse.nativePlace || null,
-              date_of_birth: son.spouse.dateOfBirth || null,
-              age: sonSpouseAge,
-              occupation: son.spouse.occupation as any || null,
-              number_of_children: son.spouse.numberOfChildren || 0
-            })
-            .select()
-            .single();
-
-          if (sonSpouseError) {
-            throw sonSpouseError;
-          }
-
-          // Insert grandchildren
-          if (son.spouse.grandchildren) {
-            for (let j = 0; j < son.spouse.grandchildren.length; j++) {
-              const grandchild = son.spouse.grandchildren[j];
-              if (!grandchild.firstName && !grandchild.lastName) continue;
-
-              const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-              
-              const { error: grandchildError } = await supabase
-                .from('grandchildren')
-                .insert({
-                  child_spouse_id: sonSpouseData.id,
-                  first_name: grandchild.firstName || null,
-                  last_name: grandchild.lastName || null,
-                  contact_number: grandchild.contactNumber || null,
-                  date_of_birth: grandchild.dateOfBirth || null,
-                  age: grandchildAge,
-                  occupation: grandchild.occupation as any || null,
-                  current_place: grandchild.currentPlace || null,
-                  phone_number: grandchild.phoneNumber || null,
-                  grandchild_index: j
-                });
-
-              if (grandchildError) {
-                throw grandchildError;
-              }
-            }
-          }
-        }
-      }
-
-      // Insert children (daughters)
-      for (let i = 0; i < familyData.daughters.length; i++) {
-        const daughter = familyData.daughters[i];
-        if (!daughter.firstName && !daughter.lastName) continue;
-
-        const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
-        
-        const { data: daughterData, error: daughterError } = await supabase
-          .from('children')
-          .insert({
-            family_head_id: familyHeadId,
-            first_name: daughter.firstName || null,
-            last_name: daughter.lastName || null,
-            contact_number: daughter.contactNumber || null,
-            date_of_birth: daughter.dateOfBirth || null,
-            age: daughterAge,
-            occupation: daughter.occupation as any || null,
-            current_place: daughter.currentPlace || null,
-            phone_number: daughter.phoneNumber || null,
-            marital_status: daughter.maritalStatus as any || null,
-            child_type: 'daughter',
-            child_index: i
-          })
-          .select()
-          .single();
-
-        if (daughterError) {
-          throw daughterError;
-        }
-
-        // Insert daughter's spouse if married
-        if (daughter.maritalStatus === 'married' && daughter.spouse) {
-          const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
-          
-          const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
-            .from('child_spouses')
-            .insert({
-              child_id: daughterData.id,
-              first_name: daughter.spouse.firstName || null,
-              last_name: daughter.spouse.lastName || null,
-              contact_number: daughter.spouse.contactNumber || null,
-              native_place: daughter.spouse.nativePlace || null,
-              date_of_birth: daughter.spouse.dateOfBirth || null,
-              age: daughterSpouseAge,
-              occupation: daughter.spouse.occupation as any || null,
-              number_of_children: daughter.spouse.numberOfChildren || 0
-            })
-            .select()
-            .single();
-
-          if (daughterSpouseError) {
-            throw daughterSpouseError;
-          }
-
-          // Insert grandchildren
-          if (daughter.spouse.grandchildren) {
-            for (let j = 0; j < daughter.spouse.grandchildren.length; j++) {
-              const grandchild = daughter.spouse.grandchildren[j];
-              if (!grandchild.firstName && !grandchild.lastName) continue;
-
-              const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-              
-              const { error: grandchildError } = await supabase
-                .from('grandchildren')
-                .insert({
-                  child_spouse_id: daughterSpouseData.id,
-                  first_name: grandchild.firstName || null,
-                  last_name: grandchild.lastName || null,
-                  contact_number: grandchild.contactNumber || null,
-                  date_of_birth: grandchild.dateOfBirth || null,
-                  age: grandchildAge,
-                  occupation: grandchild.occupation as any || null,
-                  current_place: grandchild.currentPlace || null,
-                  phone_number: grandchild.phoneNumber || null,
-                  grandchild_index: j
-                });
-
-              if (grandchildError) {
-                throw grandchildError;
-              }
-            }
-          }
-        }
-      }
-
-      showToast('Form Submitted Successfully!', 'Family information has been saved.');
-      console.log('Data successfully saved to Supabase!');
       
-    } catch (error) {
-      console.error('Form submission error:', error);
-      showToast('Error', `Failed to save family information: ${(error as Error).message}`);
+      console.log('Spouse inserted successfully:', spouseData);
     }
-  } else {
-    showToast('Validation Error', validation.errors.join(', '));
+
+    // Insert children (sons)
+    for (let i = 0; i < familyData.sons.length; i++) {
+      const son = familyData.sons[i];
+      if (!son.firstName && !son.lastName) continue;
+
+      const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
+      
+      console.log(`Inserting son ${i + 1}:`, son);
+      
+      const { data: sonData, error: sonError } = await supabase
+        .from('children')
+        .insert({
+          family_head_id: familyHeadId,
+          first_name: son.firstName || null,
+          last_name: son.lastName || null,
+          contact_number: son.contactNumber || null,
+          date_of_birth: son.dateOfBirth || null,
+          age: sonAge,
+          occupation: son.occupation as any || null,
+          current_place: son.currentPlace || null,
+          phone_number: son.phoneNumber || null,
+          marital_status: son.maritalStatus as any || null,
+          child_type: 'son',
+          child_index: i
+        })
+        .select()
+        .single();
+
+      if (sonError) {
+        console.error(`Son ${i + 1} insertion error:`, sonError);
+        throw sonError;
+      }
+
+      console.log(`Son ${i + 1} inserted successfully:`, sonData);
+
+      // Insert son's spouse if married
+      if (son.maritalStatus === 'married' && son.spouse) {
+        const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
+        
+        console.log(`Inserting son ${i + 1}'s spouse:`, son.spouse);
+        
+        const { data: sonSpouseData, error: sonSpouseError } = await supabase
+          .from('child_spouses')
+          .insert({
+            child_id: sonData.id,
+            first_name: son.spouse.firstName || null,
+            last_name: son.spouse.lastName || null,
+            contact_number: son.spouse.contactNumber || null,
+            native_place: son.spouse.nativePlace || null,
+            date_of_birth: son.spouse.dateOfBirth || null,
+            age: sonSpouseAge,
+            occupation: son.spouse.occupation as any || null,
+            number_of_children: son.spouse.numberOfChildren || 0
+          })
+          .select()
+          .single();
+
+        if (sonSpouseError) {
+          console.error(`Son ${i + 1}'s spouse insertion error:`, sonSpouseError);
+          throw sonSpouseError;
+        }
+
+        console.log(`Son ${i + 1}'s spouse inserted successfully:`, sonSpouseData);
+
+        // Insert grandchildren
+        if (son.spouse.grandchildren) {
+          for (let j = 0; j < son.spouse.grandchildren.length; j++) {
+            const grandchild = son.spouse.grandchildren[j];
+            if (!grandchild.firstName && !grandchild.lastName) continue;
+
+            const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+            
+            console.log(`Inserting son ${i + 1}'s grandchild ${j + 1}:`, grandchild);
+            
+            const { error: grandchildError } = await supabase
+              .from('grandchildren')
+              .insert({
+                child_spouse_id: sonSpouseData.id,
+                first_name: grandchild.firstName || null,
+                last_name: grandchild.lastName || null,
+                contact_number: grandchild.contactNumber || null,
+                date_of_birth: grandchild.dateOfBirth || null,
+                age: grandchildAge,
+                occupation: grandchild.occupation as any || null,
+                current_place: grandchild.currentPlace || null,
+                phone_number: grandchild.phoneNumber || null,
+                grandchild_index: j
+              });
+
+            if (grandchildError) {
+              console.error(`Son ${i + 1}'s grandchild ${j + 1} insertion error:`, grandchildError);
+              throw grandchildError;
+            }
+            
+            console.log(`Son ${i + 1}'s grandchild ${j + 1} inserted successfully`);
+          }
+        }
+      }
+    }
+
+    // Insert children (daughters)
+    for (let i = 0; i < familyData.daughters.length; i++) {
+      const daughter = familyData.daughters[i];
+      if (!daughter.firstName && !daughter.lastName) continue;
+
+      const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
+      
+      console.log(`Inserting daughter ${i + 1}:`, daughter);
+      
+      const { data: daughterData, error: daughterError } = await supabase
+        .from('children')
+        .insert({
+          family_head_id: familyHeadId,
+          first_name: daughter.firstName || null,
+          last_name: daughter.lastName || null,
+          contact_number: daughter.contactNumber || null,
+          date_of_birth: daughter.dateOfBirth || null,
+          age: daughterAge,
+          occupation: daughter.occupation as any || null,
+          current_place: daughter.currentPlace || null,
+          phone_number: daughter.phoneNumber || null,
+          marital_status: daughter.maritalStatus as any || null,
+          child_type: 'daughter',
+          child_index: i
+        })
+        .select()
+        .single();
+
+      if (daughterError) {
+        console.error(`Daughter ${i + 1} insertion error:`, daughterError);
+        throw daughterError;
+      }
+
+      console.log(`Daughter ${i + 1} inserted successfully:`, daughterData);
+
+      // Insert daughter's spouse if married
+      if (daughter.maritalStatus === 'married' && daughter.spouse) {
+        const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
+        
+        console.log(`Inserting daughter ${i + 1}'s spouse:`, daughter.spouse);
+        
+        const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
+          .from('child_spouses')
+          .insert({
+            child_id: daughterData.id,
+            first_name: daughter.spouse.firstName || null,
+            last_name: daughter.spouse.lastName || null,
+            contact_number: daughter.spouse.contactNumber || null,
+            native_place: daughter.spouse.nativePlace || null,
+            date_of_birth: daughter.spouse.dateOfBirth || null,
+            age: daughterSpouseAge,
+            occupation: daughter.spouse.occupation as any || null,
+            number_of_children: daughter.spouse.numberOfChildren || 0
+          })
+          .select()
+          .single();
+
+        if (daughterSpouseError) {
+          console.error(`Daughter ${i + 1}'s spouse insertion error:`, daughterSpouseError);
+          throw daughterSpouseError;
+        }
+
+        console.log(`Daughter ${i + 1}'s spouse inserted successfully:`, daughterSpouseData);
+
+        // Insert grandchildren
+        if (daughter.spouse.grandchildren) {
+          for (let j = 0; j < daughter.spouse.grandchildren.length; j++) {
+            const grandchild = daughter.spouse.grandchildren[j];
+            if (!grandchild.firstName && !grandchild.lastName) continue;
+
+            const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
+            
+            console.log(`Inserting daughter ${i + 1}'s grandchild ${j + 1}:`, grandchild);
+            
+            const { error: grandchildError } = await supabase
+              .from('grandchildren')
+              .insert({
+                child_spouse_id: daughterSpouseData.id,
+                first_name: grandchild.firstName || null,
+                last_name: grandchild.lastName || null,
+                contact_number: grandchild.contactNumber || null,
+                date_of_birth: grandchild.dateOfBirth || null,
+                age: grandchildAge,
+                occupation: grandchild.occupation as any || null,
+                current_place: grandchild.currentPlace || null,
+                phone_number: grandchild.phoneNumber || null,
+                grandchild_index: j
+              });
+
+            if (grandchildError) {
+              console.error(`Daughter ${i + 1}'s grandchild ${j + 1} insertion error:`, grandchildError);
+              throw grandchildError;
+            }
+            
+            console.log(`Daughter ${i + 1}'s grandchild ${j + 1} inserted successfully`);
+          }
+        }
+      }
+    }
+
+    console.log('=== ALL DATA SAVED SUCCESSFULLY ===');
+    showToast('Success!', 'Family information has been saved to database successfully!');
+    
+    // Clear form after successful submission
+    resetForm();
+    
+  } catch (error) {
+    console.error('=== FORM SUBMISSION ERROR ===', error);
+    showToast('Error', `Failed to save family information: ${(error as Error).message}`);
   }
+}
+
+// Reset form after successful submission
+function resetForm() {
+  // Reset global data
+  familyData = {
+    familyHead: {
+      firstName: '',
+      lastName: '',
+      dateOfBirth: '',
+      nativePlace: '',
+      currentPlace: '',
+      contactNumber: '',
+      maritalStatus: '',
+      occupation: ''
+    },
+    spouse: {
+      firstName: '',
+      lastName: '',
+      dateOfBirth: '',
+      nativePlace: '',
+      currentPlace: '',
+      contactNumber: '',
+      maritalStatus: '',
+      occupation: '',
+      numberOfSons: 0,
+      numberOfDaughters: 0
+    },
+    sons: [],
+    daughters: []
+  };
+  
+  // Reset all form fields
+  const allInputs = document.querySelectorAll('input, select');
+  allInputs.forEach(input => {
+    if (input instanceof HTMLInputElement) {
+      input.value = '';
+    } else if (input instanceof HTMLSelectElement) {
+      input.selectedIndex = 0;
+    }
+  });
+  
+  // Hide sections
+  const spouseSection = document.getElementById('spouseSection');
+  const sonsSection = document.getElementById('sonsSection');
+  const daughtersSection = document.getElementById('daughtersSection');
+  
+  if (spouseSection) spouseSection.style.display = 'none';
+  if (sonsSection) sonsSection.style.display = 'none';
+  if (daughtersSection) daughtersSection.style.display = 'none';
+  
+  // Clear containers
+  const sonsContainer = document.getElementById('sonsContainer');
+  const daughtersContainer = document.getElementById('daughtersContainer');
+  
+  if (sonsContainer) sonsContainer.innerHTML = '';
+  if (daughtersContainer) daughtersContainer.innerHTML = '';
+  
+  console.log('Form reset completed');
 }
 
 // Initialize the application
 function init() {
+  console.log('=== INITIALIZING FAMILY FORM ===');
   setupFamilyHeadEvents();
   setupSpouseEvents();
   
   // Submit button event
   const submitBtn = document.getElementById('submitBtn');
   if (submitBtn) {
-    submitBtn.addEventListener('click', submitForm);
+    submitBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      console.log('Submit button clicked');
+      submitForm();
+    });
+    console.log('Submit button event listener attached');
+  } else {
+    console.error('Submit button not found!');
   }
   
-  console.log('Family form initialized');
+  console.log('Family form initialized successfully');
 }
 
 const FamilyForm = () => {
   useEffect(() => {
-    init();
+    // Wait for DOM to be ready
+    const timer = setTimeout(() => {
+      init();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   return null; // This component just adds functionality to the existing HTML
