@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -14,41 +14,17 @@ let familyData = {
 function calculateAge(birthDate) {
   if (!birthDate) return '';
   
-  // Handle dd/mm/yyyy format
-  let date;
-  if (birthDate.includes('/')) {
-    const [day, month, year] = birthDate.split('/');
-    date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  } else {
-    date = new Date(birthDate);
-  }
-  
   const today = new Date();
-  let age = today.getFullYear() - date.getFullYear();
-  const monthDiff = today.getMonth() - date.getMonth();
+  const birth = new Date(birthDate);
   
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
     age--;
   }
   
   return age;
-}
-
-function convertDateFormat(dateString) {
-  if (!dateString) return null;
-  
-  // If it's already in yyyy-mm-dd format, return as is
-  if (dateString.includes('-')) {
-    return dateString;
-  }
-  
-  // Convert dd/mm/yyyy to yyyy-mm-dd
-  if (dateString.includes('/')) {
-    const [day, month, year] = dateString.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-  
-  return dateString;
 }
 
 function showToast(title, message) {
@@ -296,6 +272,8 @@ function generateChildrenForms(type, count) {
   const container = document.getElementById(type === 'sons' ? 'sonsContainer' : 'daughtersContainer');
   const section = document.getElementById(type === 'sons' ? 'sonsSection' : 'daughtersSection');
   
+  if (!container || !section) return;
+  
   container.innerHTML = '';
   
   if (count > 0) {
@@ -416,9 +394,13 @@ function updateChildData(input, index, type) {
   if (field === 'dateOfBirth') {
     const ageElement = document.getElementById(`${type}Age${index}`);
     if (value) {
-      ageElement.textContent = `Age: ${calculateAge(value)}`;
+      if (ageElement) {
+        ageElement.textContent = `Age: ${calculateAge(value)}`;
+      }
     } else {
-      ageElement.textContent = '';
+      if (ageElement) {
+        ageElement.textContent = '';
+      }
     }
   }
   
@@ -426,10 +408,14 @@ function updateChildData(input, index, type) {
   if (field === 'maritalStatus') {
     const spouseContainer = document.getElementById(`${type}Spouse${index}`);
     if (value === 'married') {
-      spouseContainer.style.display = 'block';
-      createSpouseForm(spouseContainer, index, type);
+      if (spouseContainer) {
+        spouseContainer.style.display = 'block';
+        createSpouseForm(spouseContainer, index, type);
+      }
     } else {
-      spouseContainer.style.display = 'none';
+      if (spouseContainer) {
+        spouseContainer.style.display = 'none';
+      }
       familyData[type][index].spouse = null;
     }
   }
@@ -545,9 +531,13 @@ function updateSpouseData(input, childIndex, childType) {
   if (field === 'dateOfBirth') {
     const ageElement = document.getElementById(`${childType}SpouseAge${childIndex}`);
     if (value) {
-      ageElement.textContent = `Age: ${calculateAge(value)}`;
+      if (ageElement) {
+        ageElement.textContent = `Age: ${calculateAge(value)}`;
+      }
     } else {
-      ageElement.textContent = '';
+      if (ageElement) {
+        ageElement.textContent = '';
+      }
     }
   }
   
@@ -555,10 +545,14 @@ function updateSpouseData(input, childIndex, childType) {
   if (field === 'numberOfChildren') {
     const grandchildrenContainer = document.getElementById(`${childType}Grandchildren${childIndex}`);
     if (value > 0) {
-      grandchildrenContainer.style.display = 'block';
-      createGrandchildrenForms(grandchildrenContainer, value, childIndex, childType);
+      if (grandchildrenContainer) {
+        grandchildrenContainer.style.display = 'block';
+        createGrandchildrenForms(grandchildrenContainer, value, childIndex, childType);
+      }
     } else {
-      grandchildrenContainer.style.display = 'none';
+      if (grandchildrenContainer) {
+        grandchildrenContainer.style.display = 'none';
+      }
       familyData[childType][childIndex].spouse.grandchildren = [];
     }
   }
@@ -665,9 +659,13 @@ function updateGrandchildData(input, grandchildIndex, childIndex, childType) {
   if (field === 'dateOfBirth') {
     const ageElement = document.getElementById(`${childType}GrandchildAge${childIndex}_${grandchildIndex}`);
     if (value) {
-      ageElement.textContent = `Age: ${calculateAge(value)}`;
+      if (ageElement) {
+        ageElement.textContent = `Age: ${calculateAge(value)}`;
+      }
     } else {
-      ageElement.textContent = '';
+      if (ageElement) {
+        ageElement.textContent = '';
+      }
     }
   }
 }
@@ -711,23 +709,17 @@ function validateForm() {
 
 // Submit form
 async function submitForm() {
-  console.log('Starting form submission...');
-  console.log('Current familyData:', familyData);
-  
   const validation = validateForm();
   
   if (validation.isValid) {
     try {
+      console.log('Family Head Data:', familyData.familyHead);
+      console.log('Spouse Data:', familyData.spouse);
+      console.log('Sons Data:', familyData.sons);
+      console.log('Daughters Data:', familyData.daughters);
+      
       // Calculate age for family head
       const headAge = calculateAge(familyData.familyHead.dateOfBirth);
-      const convertedHeadDate = convertDateFormat(familyData.familyHead.dateOfBirth);
-      
-      console.log('Inserting family head with data:', {
-        first_name: familyData.familyHead.firstName,
-        last_name: familyData.familyHead.lastName,
-        date_of_birth: convertedHeadDate,
-        age: headAge
-      });
       
       // Insert family head
       const { data: familyHeadData, error: familyHeadError } = await supabase
@@ -735,7 +727,7 @@ async function submitForm() {
         .insert({
           first_name: familyData.familyHead.firstName,
           last_name: familyData.familyHead.lastName,
-          date_of_birth: convertedHeadDate,
+          date_of_birth: familyData.familyHead.dateOfBirth,
           age: headAge,
           native_place: familyData.familyHead.nativePlace || null,
           current_place: familyData.familyHead.currentPlace || null,
@@ -747,18 +739,14 @@ async function submitForm() {
         .single();
 
       if (familyHeadError) {
-        console.error('Family head error:', familyHeadError);
         throw familyHeadError;
       }
 
-      console.log('Family head inserted:', familyHeadData);
       const familyHeadId = familyHeadData.id;
 
       // Insert spouse if married
-      let spouseId = null;
       if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
         const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
-        const convertedSpouseDate = convertDateFormat(familyData.spouse.dateOfBirth);
         
         const { data: spouseData, error: spouseError } = await supabase
           .from('spouses')
@@ -766,7 +754,7 @@ async function submitForm() {
             family_head_id: familyHeadId,
             first_name: familyData.spouse.firstName || null,
             last_name: familyData.spouse.lastName || null,
-            date_of_birth: convertedSpouseDate,
+            date_of_birth: familyData.spouse.dateOfBirth || null,
             age: spouseAge,
             native_place: familyData.spouse.nativePlace || null,
             contact_number: familyData.spouse.contactNumber || null,
@@ -778,12 +766,8 @@ async function submitForm() {
           .single();
 
         if (spouseError) {
-          console.error('Spouse error:', spouseError);
           throw spouseError;
         }
-        
-        console.log('Spouse inserted:', spouseData);
-        spouseId = spouseData.id;
       }
 
       // Insert children (sons)
@@ -792,7 +776,6 @@ async function submitForm() {
         if (!son.firstName && !son.lastName) continue;
 
         const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
-        const convertedSonDate = convertDateFormat(son.dateOfBirth);
         
         const { data: sonData, error: sonError } = await supabase
           .from('children')
@@ -801,7 +784,7 @@ async function submitForm() {
             first_name: son.firstName || null,
             last_name: son.lastName || null,
             contact_number: son.contactNumber || null,
-            date_of_birth: convertedSonDate,
+            date_of_birth: son.dateOfBirth || null,
             age: sonAge,
             occupation: son.occupation || null,
             current_place: son.currentPlace || null,
@@ -814,16 +797,12 @@ async function submitForm() {
           .single();
 
         if (sonError) {
-          console.error('Son error:', sonError);
           throw sonError;
         }
-
-        console.log('Son inserted:', sonData);
 
         // Insert son's spouse if married
         if (son.maritalStatus === 'married' && son.spouse) {
           const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
-          const convertedSonSpouseDate = convertDateFormat(son.spouse.dateOfBirth);
           
           const { data: sonSpouseData, error: sonSpouseError } = await supabase
             .from('child_spouses')
@@ -833,7 +812,7 @@ async function submitForm() {
               last_name: son.spouse.lastName || null,
               contact_number: son.spouse.contactNumber || null,
               native_place: son.spouse.nativePlace || null,
-              date_of_birth: convertedSonSpouseDate,
+              date_of_birth: son.spouse.dateOfBirth || null,
               age: sonSpouseAge,
               occupation: son.spouse.occupation || null,
               number_of_children: son.spouse.numberOfChildren || 0
@@ -842,11 +821,8 @@ async function submitForm() {
             .single();
 
           if (sonSpouseError) {
-            console.error('Son spouse error:', sonSpouseError);
             throw sonSpouseError;
           }
-
-          console.log('Son spouse inserted:', sonSpouseData);
 
           // Insert grandchildren
           if (son.spouse.grandchildren) {
@@ -855,7 +831,6 @@ async function submitForm() {
               if (!grandchild.firstName && !grandchild.lastName) continue;
 
               const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-              const convertedGrandchildDate = convertDateFormat(grandchild.dateOfBirth);
               
               const { error: grandchildError } = await supabase
                 .from('grandchildren')
@@ -864,7 +839,7 @@ async function submitForm() {
                   first_name: grandchild.firstName || null,
                   last_name: grandchild.lastName || null,
                   contact_number: grandchild.contactNumber || null,
-                  date_of_birth: convertedGrandchildDate,
+                  date_of_birth: grandchild.dateOfBirth || null,
                   age: grandchildAge,
                   occupation: grandchild.occupation || null,
                   current_place: grandchild.currentPlace || null,
@@ -873,7 +848,6 @@ async function submitForm() {
                 });
 
               if (grandchildError) {
-                console.error('Grandchild error:', grandchildError);
                 throw grandchildError;
               }
             }
@@ -887,7 +861,6 @@ async function submitForm() {
         if (!daughter.firstName && !daughter.lastName) continue;
 
         const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
-        const convertedDaughterDate = convertDateFormat(daughter.dateOfBirth);
         
         const { data: daughterData, error: daughterError } = await supabase
           .from('children')
@@ -896,7 +869,7 @@ async function submitForm() {
             first_name: daughter.firstName || null,
             last_name: daughter.lastName || null,
             contact_number: daughter.contactNumber || null,
-            date_of_birth: convertedDaughterDate,
+            date_of_birth: daughter.dateOfBirth || null,
             age: daughterAge,
             occupation: daughter.occupation || null,
             current_place: daughter.currentPlace || null,
@@ -909,16 +882,12 @@ async function submitForm() {
           .single();
 
         if (daughterError) {
-          console.error('Daughter error:', daughterError);
           throw daughterError;
         }
-
-        console.log('Daughter inserted:', daughterData);
 
         // Insert daughter's spouse if married
         if (daughter.maritalStatus === 'married' && daughter.spouse) {
           const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
-          const convertedDaughterSpouseDate = convertDateFormat(daughter.spouse.dateOfBirth);
           
           const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
             .from('child_spouses')
@@ -928,7 +897,7 @@ async function submitForm() {
               last_name: daughter.spouse.lastName || null,
               contact_number: daughter.spouse.contactNumber || null,
               native_place: daughter.spouse.nativePlace || null,
-              date_of_birth: convertedDaughterSpouseDate,
+              date_of_birth: daughter.spouse.dateOfBirth || null,
               age: daughterSpouseAge,
               occupation: daughter.spouse.occupation || null,
               number_of_children: daughter.spouse.numberOfChildren || 0
@@ -937,11 +906,8 @@ async function submitForm() {
             .single();
 
           if (daughterSpouseError) {
-            console.error('Daughter spouse error:', daughterSpouseError);
             throw daughterSpouseError;
           }
-
-          console.log('Daughter spouse inserted:', daughterSpouseData);
 
           // Insert grandchildren
           if (daughter.spouse.grandchildren) {
@@ -950,7 +916,6 @@ async function submitForm() {
               if (!grandchild.firstName && !grandchild.lastName) continue;
 
               const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-              const convertedGrandchildDate = convertDateFormat(grandchild.dateOfBirth);
               
               const { error: grandchildError } = await supabase
                 .from('grandchildren')
@@ -959,7 +924,7 @@ async function submitForm() {
                   first_name: grandchild.firstName || null,
                   last_name: grandchild.lastName || null,
                   contact_number: grandchild.contactNumber || null,
-                  date_of_birth: convertedGrandchildDate,
+                  date_of_birth: grandchild.dateOfBirth || null,
                   age: grandchildAge,
                   occupation: grandchild.occupation || null,
                   current_place: grandchild.currentPlace || null,
@@ -968,7 +933,6 @@ async function submitForm() {
                 });
 
               if (grandchildError) {
-                console.error('Grandchild error:', grandchildError);
                 throw grandchildError;
               }
             }
@@ -976,8 +940,7 @@ async function submitForm() {
         }
       }
 
-      showToast('Success!', 'Family information has been saved successfully.');
-      console.log('Form submission completed successfully');
+      showToast('Form Submitted Successfully!', 'Family information has been saved.');
       
     } catch (error) {
       console.error('Form submission error:', error);
@@ -1002,11 +965,12 @@ function init() {
   console.log('Family form initialized');
 }
 
-// Start the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
-
 const FamilyForm = () => {
-  return <div>Family Form Component</div>;
+  useEffect(() => {
+    init();
+  }, []);
+
+  return null; // This component just adds functionality to the existing HTML
 };
 
 export default FamilyForm;
