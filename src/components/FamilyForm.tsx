@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -40,16 +40,8 @@ interface GrandchildData {
   phoneNumber: string;
 }
 
-interface FamilyData {
-  familyHead: PersonData;
-  spouse: PersonData;
-  sons: PersonData[];
-  daughters: PersonData[];
-}
-
-// Global variables with proper initialization
-let familyData: FamilyData = {
-  familyHead: {
+const FamilyForm = () => {
+  const [familyHead, setFamilyHead] = useState<PersonData>({
     firstName: '',
     lastName: '',
     dateOfBirth: '',
@@ -58,8 +50,9 @@ let familyData: FamilyData = {
     contactNumber: '',
     maritalStatus: '',
     occupation: ''
-  },
-  spouse: {
+  });
+
+  const [spouse, setSpouse] = useState<PersonData>({
     firstName: '',
     lastName: '',
     dateOfBirth: '',
@@ -70,327 +63,50 @@ let familyData: FamilyData = {
     occupation: '',
     numberOfSons: 0,
     numberOfDaughters: 0
-  },
-  sons: [],
-  daughters: []
-};
-
-// Utility functions
-function calculateAge(birthDate: string): number {
-  if (!birthDate) return 0;
-  
-  const today = new Date();
-  const birth = new Date(birthDate);
-  
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  
-  return age;
-}
-
-function showToast(title: string, message: string) {
-  toast(title, { description: message });
-}
-
-function validateContactNumber(number: string): boolean {
-  return /^\d+$/.test(number);
-}
-
-function formatDateForDisplay(dateString: string): string {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-function convertDateForStorage(ddmmyyyy: string): string {
-  if (!ddmmyyyy) return '';
-  const parts = ddmmyyyy.split('/');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to YYYY-MM-DD
-  }
-  return ddmmyyyy;
-}
-
-function updateDisplayName(firstName: string, lastName: string, titleElementId: string) {
-  const titleElement = document.getElementById(titleElementId);
-  if (titleElement) {
-    const baseTitle = titleElement.textContent?.split(' (')[0] || '';
-    
-    if (firstName || lastName) {
-      const displayName = `${firstName} ${lastName}`.trim();
-      titleElement.textContent = `${baseTitle} (${displayName})`;
-    } else {
-      titleElement.textContent = baseTitle;
-    }
-  }
-}
-
-// Event listeners for Family Head
-function setupFamilyHeadEvents() {
-  console.log('Setting up family head events...');
-  
-  const firstNameInput = document.getElementById('headFirstName') as HTMLInputElement;
-  const lastNameInput = document.getElementById('headLastName') as HTMLInputElement;
-  const dateInput = document.getElementById('headDateOfBirth') as HTMLInputElement;
-  const nativeInput = document.getElementById('headNativePlace') as HTMLInputElement;
-  const currentInput = document.getElementById('headCurrentPlace') as HTMLInputElement;
-  const contactInput = document.getElementById('headContactNumber') as HTMLInputElement;
-  const maritalSelect = document.getElementById('headMaritalStatus') as HTMLSelectElement;
-  const occupationSelect = document.getElementById('headOccupation') as HTMLSelectElement;
-
-  if (firstNameInput) {
-    firstNameInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.familyHead.firstName = this.value;
-      updateDisplayName(this.value, lastNameInput?.value || '', 'familyHeadTitle');
-      console.log('Family head first name updated:', this.value);
-    });
-  }
-
-  if (lastNameInput) {
-    lastNameInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.familyHead.lastName = this.value;
-      updateDisplayName(firstNameInput?.value || '', this.value, 'familyHeadTitle');
-      console.log('Family head last name updated:', this.value);
-    });
-  }
-
-  if (nativeInput) {
-    nativeInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.familyHead.nativePlace = this.value;
-      console.log('Family head native place updated:', this.value);
-    });
-  }
-
-  if (currentInput) {
-    currentInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.familyHead.currentPlace = this.value;
-      console.log('Family head current place updated:', this.value);
-    });
-  }
-
-  if (contactInput) {
-    contactInput.addEventListener('input', function() {
-      familyData.familyHead.contactNumber = this.value;
-      const errorElement = document.getElementById('headContactNumberError');
-      if (this.value && !validateContactNumber(this.value)) {
-        if (errorElement) {
-          errorElement.textContent = 'Contact number must contain only numbers';
-          errorElement.classList.add('show');
-        }
-      } else {
-        if (errorElement) {
-          errorElement.classList.remove('show');
-        }
-      }
-      console.log('Family head contact updated:', this.value);
-    });
-  }
-
-  if (dateInput) {
-    dateInput.addEventListener('change', function() {
-      familyData.familyHead.dateOfBirth = this.value;
-      const ageElement = document.getElementById('headAge');
-      if (this.value) {
-        const age = calculateAge(this.value);
-        if (ageElement) {
-          ageElement.textContent = `Age: ${age}`;
-        }
-        console.log('Family head DOB updated:', this.value, 'Age:', age);
-      } else {
-        if (ageElement) {
-          ageElement.textContent = '';
-        }
-      }
-    });
-  }
-
-  if (maritalSelect) {
-    maritalSelect.addEventListener('change', function() {
-      familyData.familyHead.maritalStatus = this.value;
-      const spouseSection = document.getElementById('spouseSection');
-      console.log('Marital status changed to:', this.value);
-      
-      if (this.value === 'married') {
-        if (spouseSection) {
-          spouseSection.style.display = 'block';
-        }
-      } else {
-        if (spouseSection) {
-          spouseSection.style.display = 'none';
-        }
-        // Reset spouse data
-        familyData.spouse = {
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          nativePlace: '',
-          currentPlace: '',
-          contactNumber: '',
-          maritalStatus: '',
-          occupation: '',
-          numberOfSons: 0,
-          numberOfDaughters: 0
-        };
-        resetSpouseForm();
-      }
-    });
-  }
-
-  if (occupationSelect) {
-    occupationSelect.addEventListener('change', function() {
-      familyData.familyHead.occupation = this.value;
-      console.log('Family head occupation updated:', this.value);
-    });
-  }
-}
-
-// Event listeners for Spouse
-function setupSpouseEvents() {
-  console.log('Setting up spouse events...');
-  
-  const firstNameInput = document.getElementById('spouseFirstName') as HTMLInputElement;
-  const lastNameInput = document.getElementById('spouseLastName') as HTMLInputElement;
-  const dateInput = document.getElementById('spouseDateOfBirth') as HTMLInputElement;
-  const nativeInput = document.getElementById('spouseNativePlace') as HTMLInputElement;
-  const contactInput = document.getElementById('spouseContactNumber') as HTMLInputElement;
-  const occupationSelect = document.getElementById('spouseOccupation') as HTMLSelectElement;
-  const sonsSelect = document.getElementById('numberOfSons') as HTMLSelectElement;
-  const daughtersSelect = document.getElementById('numberOfDaughters') as HTMLSelectElement;
-
-  if (firstNameInput) {
-    firstNameInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.spouse.firstName = this.value;
-      updateDisplayName(this.value, lastNameInput?.value || '', 'spouseTitle');
-    });
-  }
-
-  if (lastNameInput) {
-    lastNameInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.spouse.lastName = this.value;
-      updateDisplayName(firstNameInput?.value || '', this.value, 'spouseTitle');
-    });
-  }
-
-  if (nativeInput) {
-    nativeInput.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-      familyData.spouse.nativePlace = this.value;
-    });
-  }
-
-  if (contactInput) {
-    contactInput.addEventListener('input', function() {
-      familyData.spouse.contactNumber = this.value;
-      const errorElement = document.getElementById('spouseContactNumberError');
-      if (this.value && !validateContactNumber(this.value)) {
-        if (errorElement) {
-          errorElement.textContent = 'Contact number must contain only numbers';
-          errorElement.classList.add('show');
-        }
-      } else {
-        if (errorElement) {
-          errorElement.classList.remove('show');
-        }
-      }
-    });
-  }
-
-  if (dateInput) {
-    dateInput.addEventListener('change', function() {
-      familyData.spouse.dateOfBirth = this.value;
-      const ageElement = document.getElementById('spouseAge');
-      if (this.value) {
-        const age = calculateAge(this.value);
-        if (ageElement) {
-          ageElement.textContent = `Age: ${age}`;
-        }
-      } else {
-        if (ageElement) {
-          ageElement.textContent = '';
-        }
-      }
-    });
-  }
-
-  if (occupationSelect) {
-    occupationSelect.addEventListener('change', function() {
-      familyData.spouse.occupation = this.value;
-    });
-  }
-
-  if (sonsSelect) {
-    sonsSelect.addEventListener('change', function() {
-      const numberOfSons = parseInt(this.value) || 0;
-      familyData.spouse.numberOfSons = numberOfSons;
-      console.log('Number of sons changed to:', numberOfSons);
-      generateChildrenForms('sons', numberOfSons);
-    });
-  }
-
-  if (daughtersSelect) {
-    daughtersSelect.addEventListener('change', function() {
-      const numberOfDaughters = parseInt(this.value) || 0;
-      familyData.spouse.numberOfDaughters = numberOfDaughters;
-      console.log('Number of daughters changed to:', numberOfDaughters);
-      generateChildrenForms('daughters', numberOfDaughters);
-    });
-  }
-}
-
-function resetSpouseForm() {
-  const spouseInputs = ['spouseFirstName', 'spouseLastName', 'spouseContactNumber', 'spouseNativePlace', 'spouseDateOfBirth'];
-  spouseInputs.forEach(id => {
-    const element = document.getElementById(id) as HTMLInputElement;
-    if (element) {
-      element.value = '';
-    }
   });
-  
-  const spouseOccupation = document.getElementById('spouseOccupation') as HTMLSelectElement;
-  const numberOfSons = document.getElementById('numberOfSons') as HTMLSelectElement;
-  const numberOfDaughters = document.getElementById('numberOfDaughters') as HTMLSelectElement;
-  const spouseAge = document.getElementById('spouseAge');
-  
-  if (spouseOccupation) spouseOccupation.selectedIndex = 0;
-  if (numberOfSons) numberOfSons.selectedIndex = 0;
-  if (numberOfDaughters) numberOfDaughters.selectedIndex = 0;
-  if (spouseAge) spouseAge.textContent = '';
-  
-  // Hide children sections
-  const sonsSection = document.getElementById('sonsSection');
-  const daughtersSection = document.getElementById('daughtersSection');
-  if (sonsSection) sonsSection.style.display = 'none';
-  if (daughtersSection) daughtersSection.style.display = 'none';
-}
 
-// Generate children forms
-function generateChildrenForms(type: 'sons' | 'daughters', count: number) {
-  const container = document.getElementById(type === 'sons' ? 'sonsContainer' : 'daughtersContainer');
-  const section = document.getElementById(type === 'sons' ? 'sonsSection' : 'daughtersSection');
-  
-  if (!container || !section) return;
-  
-  container.innerHTML = '';
-  
-  if (count > 0) {
-    section.style.display = 'block';
-    familyData[type] = [];
+  const [sons, setSons] = useState<PersonData[]>([]);
+  const [daughters, setDaughters] = useState<PersonData[]>([]);
+
+  // Utility functions
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0;
     
+    const today = new Date();
+    const birth = new Date(birthDate);
+    
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  const validateContactNumber = (number: string): boolean => {
+    return /^\d+$/.test(number);
+  };
+
+  const handleFamilyHeadChange = (field: keyof PersonData, value: string | number) => {
+    setFamilyHead(prev => ({
+      ...prev,
+      [field]: typeof value === 'string' ? value.toUpperCase() : value
+    }));
+  };
+
+  const handleSpouseChange = (field: keyof PersonData, value: string | number) => {
+    setSpouse(prev => ({
+      ...prev,
+      [field]: typeof value === 'string' ? value.toUpperCase() : value
+    }));
+  };
+
+  const generateChildrenForms = (type: 'sons' | 'daughters', count: number) => {
+    const newChildren: PersonData[] = [];
     for (let i = 0; i < count; i++) {
-      const childData: PersonData = {
+      newChildren.push({
         firstName: '',
         lastName: '',
         contactNumber: '',
@@ -401,837 +117,672 @@ function generateChildrenForms(type: 'sons' | 'daughters', count: number) {
         maritalStatus: '',
         nativePlace: '',
         spouse: null
-      };
-      
-      familyData[type].push(childData);
-      
-      const childForm = createChildForm(childData, i, type);
-      container.appendChild(childForm);
-    }
-  } else {
-    section.style.display = 'none';
-    familyData[type] = [];
-  }
-}
-
-function createChildForm(childData: PersonData, index: number, type: 'sons' | 'daughters'): HTMLElement {
-  const div = document.createElement('div');
-  div.className = 'child-form';
-  div.innerHTML = `
-    <h3>${type === 'sons' ? 'Son' : 'Daughter'} ${index + 1}</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="label">First Name / पहिले नाव</label>
-        <input type="text" class="input child-input" data-field="firstName" data-type="${type}" data-index="${index}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Last Name / आडनाव</label>
-        <input type="text" class="input child-input" data-field="lastName" data-type="${type}" data-index="${index}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Contact Number / संपर्क क्रमांक</label>
-        <input type="text" class="input child-input" data-field="contactNumber" data-type="${type}" data-index="${index}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Date of Birth / जन्म तारीख</label>
-        <input type="date" class="input child-input" data-field="dateOfBirth" data-type="${type}" data-index="${index}">
-        <div class="age-display" id="${type}Age${index}"></div>
-      </div>
-      <div>
-        <label class="label">Occupation / व्यवसाय</label>
-        <select class="input child-input" data-field="occupation" data-type="${type}" data-index="${index}">
-          <option value="">Select occupation / व्यवसाय निवडा</option>
-          <option value="salaried">Salaried / नोकरदार</option>
-          <option value="business">Business / व्यवसाय</option>
-          <option value="student">Student / विद्यार्थी</option>
-          <option value="unemployed">Unemployed / बेरोजगार</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Current Place / सध्याचे ठिकाण</label>
-        <input type="text" class="input child-input" data-field="currentPlace" data-type="${type}" data-index="${index}" placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Phone Number / फोन नंबर</label>
-        <input type="text" class="input child-input" data-field="phoneNumber" data-type="${type}" data-index="${index}" placeholder="Enter phone number / फोन नंबर प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Marital Status / वैवाहिक स्थिती</label>
-        <select class="input child-input" data-field="maritalStatus" data-type="${type}" data-index="${index}">
-          <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-          <option value="single">Single / अविवाहित</option>
-          <option value="married">Married / विवाहित</option>
-          <option value="divorced">Divorced / घटस्फोटित</option>
-          <option value="widowed">Widowed / विधवा</option>
-        </select>
-      </div>
-    </div>
-    <div class="spouse-section" id="${type}Spouse${index}" style="display: none;">
-    </div>
-  `;
-  
-  setupChildEventListeners(div, index, type);
-  return div;
-}
-
-function setupChildEventListeners(container: HTMLElement, index: number, type: 'sons' | 'daughters') {
-  const inputs = container.querySelectorAll('.child-input');
-  
-  inputs.forEach(input => {
-    input.addEventListener('input', function() {
-      updateChildData(this as HTMLInputElement, index, type);
-    });
-    
-    input.addEventListener('change', function() {
-      updateChildData(this as HTMLInputElement, index, type);
-    });
-  });
-}
-
-function updateChildData(input: HTMLInputElement, index: number, type: 'sons' | 'daughters') {
-  const field = input.dataset.field as keyof PersonData;
-  let value = input.value;
-  
-  // Convert text inputs to uppercase
-  if (input.type === 'text') {
-    value = value.toUpperCase();
-    input.value = value;
-  }
-  
-  (familyData[type][index] as any)[field] = value;
-  
-  // Handle age calculation for date of birth
-  if (field === 'dateOfBirth') {
-    const ageElement = document.getElementById(`${type}Age${index}`);
-    if (value) {
-      if (ageElement) {
-        ageElement.textContent = `Age: ${calculateAge(value)}`;
-      }
-    } else {
-      if (ageElement) {
-        ageElement.textContent = '';
-      }
-    }
-  }
-  
-  // Handle marital status change
-  if (field === 'maritalStatus') {
-    const spouseContainer = document.getElementById(`${type}Spouse${index}`);
-    if (value === 'married') {
-      if (spouseContainer) {
-        spouseContainer.style.display = 'block';
-        createSpouseForm(spouseContainer, index, type);
-      }
-    } else {
-      if (spouseContainer) {
-        spouseContainer.style.display = 'none';
-      }
-      familyData[type][index].spouse = null;
-    }
-  }
-}
-
-function createSpouseForm(container: HTMLElement, childIndex: number, childType: 'sons' | 'daughters') {
-  if (!familyData[childType][childIndex].spouse) {
-    familyData[childType][childIndex].spouse = {
-      firstName: '',
-      lastName: '',
-      contactNumber: '',
-      nativePlace: '',
-      dateOfBirth: '',
-      occupation: '',
-      numberOfChildren: 0,
-      grandchildren: []
-    };
-  }
-  
-  const spouseTitle = childType === 'sons' ? 'Wife' : 'Husband';
-  
-  container.innerHTML = `
-    <h4>${spouseTitle} Information</h4>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="label">First Name / पहिले नाव</label>
-        <input type="text" class="input spouse-input" data-field="firstName" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Last Name / आडनाव</label>
-        <input type="text" class="input spouse-input" data-field="lastName" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Contact Number / संपर्क क्रमांक</label>
-        <input type="text" class="input spouse-input" data-field="contactNumber" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Native Place / मूळ गाव</label>
-        <input type="text" class="input spouse-input" data-field="nativePlace" data-child-type="${childType}" data-child-index="${childIndex}" placeholder="Enter native place / मूळ गाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Date of Birth / जन्म तारीख</label>
-        <input type="date" class="input spouse-input" data-field="dateOfBirth" data-child-type="${childType}" data-child-index="${childIndex}">
-        <div class="age-display" id="${childType}SpouseAge${childIndex}"></div>
-      </div>
-      <div>
-        <label class="label">Occupation / व्यवसाय</label>
-        <select class="input spouse-input" data-field="occupation" data-child-type="${childType}" data-child-index="${childIndex}">
-          <option value="">Select occupation / व्यवसाय निवडा</option>
-          <option value="retired">Retired / निवृत्त</option>
-          <option value="housewife">Housewife / गृहिणी</option>
-          <option value="salaried">Salaried / नोकरदार</option>
-          <option value="business">Business / व्यवसाय</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Number of Children / मुलांची संख्या</label>
-        <select class="input spouse-input" data-field="numberOfChildren" data-child-type="${childType}" data-child-index="${childIndex}">
-          <option value="">Select number of children / मुलांची संख्या निवडा</option>
-          <option value="0">0</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-          <option value="10">10</option>
-        </select>
-      </div>
-    </div>
-    <div class="grandchildren-section" id="${childType}Grandchildren${childIndex}" style="display: none;">
-    </div>
-  `;
-  
-  setupSpouseEventListeners(container, childIndex, childType);
-}
-
-function setupSpouseEventListeners(container: HTMLElement, childIndex: number, childType: 'sons' | 'daughters') {
-  const inputs = container.querySelectorAll('.spouse-input');
-  
-  inputs.forEach(input => {
-    input.addEventListener('input', function() {
-      updateSpouseData(this as HTMLInputElement, childIndex, childType);
-    });
-    
-    input.addEventListener('change', function() {
-      updateSpouseData(this as HTMLInputElement, childIndex, childType);
-    });
-  });
-}
-
-function updateSpouseData(input: HTMLInputElement, childIndex: number, childType: 'sons' | 'daughters') {
-  const field = input.dataset.field as keyof SpouseData;
-  let value: string | number = input.value;
-  
-  // Convert text inputs to uppercase
-  if (input.type === 'text') {
-    value = value.toUpperCase();
-    input.value = value as string;
-  }
-  
-  // Handle number of children
-  if (field === 'numberOfChildren') {
-    value = parseInt(value as string) || 0;
-  }
-  
-  if (familyData[childType][childIndex].spouse) {
-    (familyData[childType][childIndex].spouse as any)[field] = value;
-  }
-  
-  // Handle age calculation for date of birth
-  if (field === 'dateOfBirth') {
-    const ageElement = document.getElementById(`${childType}SpouseAge${childIndex}`);
-    if (value) {
-      if (ageElement) {
-        ageElement.textContent = `Age: ${calculateAge(value as string)}`;
-      }
-    } else {
-      if (ageElement) {
-        ageElement.textContent = '';
-      }
-    }
-  }
-  
-  // Handle number of children change
-  if (field === 'numberOfChildren') {
-    const grandchildrenContainer = document.getElementById(`${childType}Grandchildren${childIndex}`);
-    if ((value as number) > 0) {
-      if (grandchildrenContainer) {
-        grandchildrenContainer.style.display = 'block';
-        createGrandchildrenForms(grandchildrenContainer, value as number, childIndex, childType);
-      }
-    } else {
-      if (grandchildrenContainer) {
-        grandchildrenContainer.style.display = 'none';
-      }
-      if (familyData[childType][childIndex].spouse) {
-        familyData[childType][childIndex].spouse!.grandchildren = [];
-      }
-    }
-  }
-}
-
-function createGrandchildrenForms(container: HTMLElement, count: number, childIndex: number, childType: 'sons' | 'daughters') {
-  if (familyData[childType][childIndex].spouse) {
-    familyData[childType][childIndex].spouse!.grandchildren = [];
-  }
-  
-  container.innerHTML = '<h5>Grandchildren / नातवंडे</h5>';
-  
-  for (let i = 0; i < count; i++) {
-    const grandchildData: GrandchildData = {
-      firstName: '',
-      lastName: '',
-      contactNumber: '',
-      dateOfBirth: '',
-      occupation: '',
-      currentPlace: '',
-      phoneNumber: ''
-    };
-    
-    if (familyData[childType][childIndex].spouse) {
-      familyData[childType][childIndex].spouse!.grandchildren.push(grandchildData);
-    }
-    
-    const grandchildForm = createGrandchildForm(grandchildData, i, childIndex, childType);
-    container.appendChild(grandchildForm);
-  }
-}
-
-function createGrandchildForm(grandchildData: GrandchildData, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters'): HTMLElement {
-  const div = document.createElement('div');
-  div.className = 'grandchild-form';
-  div.innerHTML = `
-    <h4>Grandchild ${grandchildIndex + 1}</h4>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="label">First Name / पहिले नाव</label>
-        <input type="text" class="input grandchild-input" data-field="firstName" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter first name / पहिले नाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Last Name / आडनाव</label>
-        <input type="text" class="input grandchild-input" data-field="lastName" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter last name / आडनाव प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Contact Number / संपर्क क्रमांक</label>
-        <input type="text" class="input grandchild-input" data-field="contactNumber" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Date of Birth / जन्म तारीख</label>
-        <input type="date" class="input grandchild-input" data-field="dateOfBirth" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}">
-        <div class="age-display" id="${childType}GrandchildAge${childIndex}_${grandchildIndex}"></div>
-      </div>
-      <div>
-        <label class="label">Occupation / व्यवसाय</label>
-        <select class="input grandchild-input" data-field="occupation" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}">
-          <option value="">Select occupation / व्यवसाय निवडा</option>
-          <option value="salaried">Salaried / नोकरदार</option>
-          <option value="business">Business / व्यवसाय</option>
-          <option value="student">Student / विद्यार्थी</option>
-          <option value="unemployed">Unemployed / बेरोजगार</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Current Place / सध्याचे ठिकाण</label>
-        <input type="text" class="input grandchild-input" data-field="currentPlace" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा">
-      </div>
-      <div>
-        <label class="label">Phone Number / फोन नंबर</label>
-        <input type="text" class="input grandchild-input" data-field="phoneNumber" data-child-type="${childType}" data-child-index="${childIndex}" data-grandchild-index="${grandchildIndex}" placeholder="Enter phone number / फोन नंबर प्रविष्ट करा">
-      </div>
-    </div>
-  `;
-  
-  setupGrandchildEventListeners(div, grandchildIndex, childIndex, childType);
-  return div;
-}
-
-function setupGrandchildEventListeners(container: HTMLElement, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters') {
-  const inputs = container.querySelectorAll('.grandchild-input');
-  
-  inputs.forEach(input => {
-    input.addEventListener('input', function() {
-      updateGrandchildData(this as HTMLInputElement, grandchildIndex, childIndex, childType);
-    });
-    
-    input.addEventListener('change', function() {
-      updateGrandchildData(this as HTMLInputElement, grandchildIndex, childIndex, childType);
-    });
-  });
-}
-
-function updateGrandchildData(input: HTMLInputElement, grandchildIndex: number, childIndex: number, childType: 'sons' | 'daughters') {
-  const field = input.dataset.field as keyof GrandchildData;
-  let value = input.value;
-  
-  // Convert text inputs to uppercase
-  if (input.type === 'text') {
-    value = value.toUpperCase();
-    input.value = value;
-  }
-  
-  if (familyData[childType][childIndex].spouse) {
-    (familyData[childType][childIndex].spouse!.grandchildren[grandchildIndex] as any)[field] = value;
-  }
-  
-  // Handle age calculation for date of birth
-  if (field === 'dateOfBirth') {
-    const ageElement = document.getElementById(`${childType}GrandchildAge${childIndex}_${grandchildIndex}`);
-    if (value) {
-      if (ageElement) {
-        ageElement.textContent = `Age: ${calculateAge(value)}`;
-      }
-    } else {
-      if (ageElement) {
-        ageElement.textContent = '';
-      }
-    }
-  }
-}
-
-// Form validation
-function validateForm() {
-  let isValid = true;
-  const errors: string[] = [];
-  
-  console.log('Validating form with data:', familyData);
-  
-  // Validate family head
-  if (!familyData.familyHead.firstName) {
-    errors.push('Family head first name is required');
-    isValid = false;
-  }
-  
-  if (!familyData.familyHead.lastName) {
-    errors.push('Family head last name is required');
-    isValid = false;
-  }
-  
-  if (!familyData.familyHead.dateOfBirth) {
-    errors.push('Family head date of birth is required');
-    isValid = false;
-  }
-  
-  if (familyData.familyHead.contactNumber && !validateContactNumber(familyData.familyHead.contactNumber)) {
-    errors.push('Family head contact number must contain only numbers');
-    isValid = false;
-  }
-  
-  // Validate spouse if married
-  if (familyData.familyHead.maritalStatus === 'married') {
-    if (familyData.spouse.contactNumber && !validateContactNumber(familyData.spouse.contactNumber)) {
-      errors.push('Spouse contact number must contain only numbers');
-      isValid = false;
-    }
-  }
-  
-  return { isValid, errors };
-}
-
-// Submit form - THIS IS THE KEY FUNCTION FOR SAVING DATA
-async function submitForm() {
-  console.log('=== STARTING FORM SUBMISSION ===');
-  console.log('Current family data:', JSON.stringify(familyData, null, 2));
-  
-  const validation = validateForm();
-  
-  if (!validation.isValid) {
-    console.log('Validation failed:', validation.errors);
-    showToast('Validation Error', validation.errors.join(', '));
-    return;
-  }
-  
-  try {
-    console.log('Starting database operations...');
-    
-    // Calculate age for family head
-    const headAge = calculateAge(familyData.familyHead.dateOfBirth);
-    console.log('Family head age calculated:', headAge);
-    
-    // Insert family head
-    console.log('Inserting family head with data:', {
-      first_name: familyData.familyHead.firstName,
-      last_name: familyData.familyHead.lastName,
-      date_of_birth: familyData.familyHead.dateOfBirth,
-      age: headAge,
-      native_place: familyData.familyHead.nativePlace || null,
-      current_place: familyData.familyHead.currentPlace || null,
-      contact_number: familyData.familyHead.contactNumber || null,
-      marital_status: familyData.familyHead.maritalStatus,
-      occupation: familyData.familyHead.occupation || null
-    });
-    
-    const { data: familyHeadData, error: familyHeadError } = await supabase
-      .from('family_heads')
-      .insert({
-        first_name: familyData.familyHead.firstName,
-        last_name: familyData.familyHead.lastName,
-        date_of_birth: familyData.familyHead.dateOfBirth,
-        age: headAge,
-        native_place: familyData.familyHead.nativePlace || null,
-        current_place: familyData.familyHead.currentPlace || null,
-        contact_number: familyData.familyHead.contactNumber || null,
-        marital_status: familyData.familyHead.maritalStatus as any,
-        occupation: familyData.familyHead.occupation as any || null
-      })
-      .select()
-      .single();
-
-    if (familyHeadError) {
-      console.error('Family head insertion error:', familyHeadError);
-      throw familyHeadError;
-    }
-
-    console.log('Family head inserted successfully:', familyHeadData);
-    const familyHeadId = familyHeadData.id;
-
-    // Insert spouse if married
-    if (familyData.familyHead.maritalStatus === 'married' && (familyData.spouse.firstName || familyData.spouse.lastName)) {
-      const spouseAge = familyData.spouse.dateOfBirth ? calculateAge(familyData.spouse.dateOfBirth) : null;
-      
-      console.log('Inserting spouse with data:', {
-        family_head_id: familyHeadId,
-        first_name: familyData.spouse.firstName || null,
-        last_name: familyData.spouse.lastName || null,
-        date_of_birth: familyData.spouse.dateOfBirth || null,
-        age: spouseAge,
-        native_place: familyData.spouse.nativePlace || null,
-        contact_number: familyData.spouse.contactNumber || null,
-        occupation: familyData.spouse.occupation || null,
-        number_of_sons: familyData.spouse.numberOfSons || 0,
-        number_of_daughters: familyData.spouse.numberOfDaughters || 0
       });
-      
-      const { data: spouseData, error: spouseError } = await supabase
-        .from('spouses')
-        .insert({
-          family_head_id: familyHeadId,
-          first_name: familyData.spouse.firstName || null,
-          last_name: familyData.spouse.lastName || null,
-          date_of_birth: familyData.spouse.dateOfBirth || null,
-          age: spouseAge,
-          native_place: familyData.spouse.nativePlace || null,
-          contact_number: familyData.spouse.contactNumber || null,
-          occupation: familyData.spouse.occupation as any || null,
-          number_of_sons: familyData.spouse.numberOfSons || 0,
-          number_of_daughters: familyData.spouse.numberOfDaughters || 0
-        })
-        .select()
-        .single();
-
-      if (spouseError) {
-        console.error('Spouse insertion error:', spouseError);
-        throw spouseError;
-      }
-      
-      console.log('Spouse inserted successfully:', spouseData);
     }
-
-    // Insert children (sons)
-    for (let i = 0; i < familyData.sons.length; i++) {
-      const son = familyData.sons[i];
-      if (!son.firstName && !son.lastName) continue;
-
-      const sonAge = son.dateOfBirth ? calculateAge(son.dateOfBirth) : null;
-      
-      console.log(`Inserting son ${i + 1}:`, son);
-      
-      const { data: sonData, error: sonError } = await supabase
-        .from('children')
-        .insert({
-          family_head_id: familyHeadId,
-          first_name: son.firstName || null,
-          last_name: son.lastName || null,
-          contact_number: son.contactNumber || null,
-          date_of_birth: son.dateOfBirth || null,
-          age: sonAge,
-          occupation: son.occupation as any || null,
-          current_place: son.currentPlace || null,
-          phone_number: son.phoneNumber || null,
-          marital_status: son.maritalStatus as any || null,
-          child_type: 'son',
-          child_index: i
-        })
-        .select()
-        .single();
-
-      if (sonError) {
-        console.error(`Son ${i + 1} insertion error:`, sonError);
-        throw sonError;
-      }
-
-      console.log(`Son ${i + 1} inserted successfully:`, sonData);
-
-      // Insert son's spouse if married
-      if (son.maritalStatus === 'married' && son.spouse) {
-        const sonSpouseAge = son.spouse.dateOfBirth ? calculateAge(son.spouse.dateOfBirth) : null;
-        
-        console.log(`Inserting son ${i + 1}'s spouse:`, son.spouse);
-        
-        const { data: sonSpouseData, error: sonSpouseError } = await supabase
-          .from('child_spouses')
-          .insert({
-            child_id: sonData.id,
-            first_name: son.spouse.firstName || null,
-            last_name: son.spouse.lastName || null,
-            contact_number: son.spouse.contactNumber || null,
-            native_place: son.spouse.nativePlace || null,
-            date_of_birth: son.spouse.dateOfBirth || null,
-            age: sonSpouseAge,
-            occupation: son.spouse.occupation as any || null,
-            number_of_children: son.spouse.numberOfChildren || 0
-          })
-          .select()
-          .single();
-
-        if (sonSpouseError) {
-          console.error(`Son ${i + 1}'s spouse insertion error:`, sonSpouseError);
-          throw sonSpouseError;
-        }
-
-        console.log(`Son ${i + 1}'s spouse inserted successfully:`, sonSpouseData);
-
-        // Insert grandchildren
-        if (son.spouse.grandchildren) {
-          for (let j = 0; j < son.spouse.grandchildren.length; j++) {
-            const grandchild = son.spouse.grandchildren[j];
-            if (!grandchild.firstName && !grandchild.lastName) continue;
-
-            const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-            
-            console.log(`Inserting son ${i + 1}'s grandchild ${j + 1}:`, grandchild);
-            
-            const { error: grandchildError } = await supabase
-              .from('grandchildren')
-              .insert({
-                child_spouse_id: sonSpouseData.id,
-                first_name: grandchild.firstName || null,
-                last_name: grandchild.lastName || null,
-                contact_number: grandchild.contactNumber || null,
-                date_of_birth: grandchild.dateOfBirth || null,
-                age: grandchildAge,
-                occupation: grandchild.occupation as any || null,
-                current_place: grandchild.currentPlace || null,
-                phone_number: grandchild.phoneNumber || null,
-                grandchild_index: j
-              });
-
-            if (grandchildError) {
-              console.error(`Son ${i + 1}'s grandchild ${j + 1} insertion error:`, grandchildError);
-              throw grandchildError;
-            }
-            
-            console.log(`Son ${i + 1}'s grandchild ${j + 1} inserted successfully`);
-          }
-        }
-      }
-    }
-
-    // Insert children (daughters)
-    for (let i = 0; i < familyData.daughters.length; i++) {
-      const daughter = familyData.daughters[i];
-      if (!daughter.firstName && !daughter.lastName) continue;
-
-      const daughterAge = daughter.dateOfBirth ? calculateAge(daughter.dateOfBirth) : null;
-      
-      console.log(`Inserting daughter ${i + 1}:`, daughter);
-      
-      const { data: daughterData, error: daughterError } = await supabase
-        .from('children')
-        .insert({
-          family_head_id: familyHeadId,
-          first_name: daughter.firstName || null,
-          last_name: daughter.lastName || null,
-          contact_number: daughter.contactNumber || null,
-          date_of_birth: daughter.dateOfBirth || null,
-          age: daughterAge,
-          occupation: daughter.occupation as any || null,
-          current_place: daughter.currentPlace || null,
-          phone_number: daughter.phoneNumber || null,
-          marital_status: daughter.maritalStatus as any || null,
-          child_type: 'daughter',
-          child_index: i
-        })
-        .select()
-        .single();
-
-      if (daughterError) {
-        console.error(`Daughter ${i + 1} insertion error:`, daughterError);
-        throw daughterError;
-      }
-
-      console.log(`Daughter ${i + 1} inserted successfully:`, daughterData);
-
-      // Insert daughter's spouse if married
-      if (daughter.maritalStatus === 'married' && daughter.spouse) {
-        const daughterSpouseAge = daughter.spouse.dateOfBirth ? calculateAge(daughter.spouse.dateOfBirth) : null;
-        
-        console.log(`Inserting daughter ${i + 1}'s spouse:`, daughter.spouse);
-        
-        const { data: daughterSpouseData, error: daughterSpouseError } = await supabase
-          .from('child_spouses')
-          .insert({
-            child_id: daughterData.id,
-            first_name: daughter.spouse.firstName || null,
-            last_name: daughter.spouse.lastName || null,
-            contact_number: daughter.spouse.contactNumber || null,
-            native_place: daughter.spouse.nativePlace || null,
-            date_of_birth: daughter.spouse.dateOfBirth || null,
-            age: daughterSpouseAge,
-            occupation: daughter.spouse.occupation as any || null,
-            number_of_children: daughter.spouse.numberOfChildren || 0
-          })
-          .select()
-          .single();
-
-        if (daughterSpouseError) {
-          console.error(`Daughter ${i + 1}'s spouse insertion error:`, daughterSpouseError);
-          throw daughterSpouseError;
-        }
-
-        console.log(`Daughter ${i + 1}'s spouse inserted successfully:`, daughterSpouseData);
-
-        // Insert grandchildren
-        if (daughter.spouse.grandchildren) {
-          for (let j = 0; j < daughter.spouse.grandchildren.length; j++) {
-            const grandchild = daughter.spouse.grandchildren[j];
-            if (!grandchild.firstName && !grandchild.lastName) continue;
-
-            const grandchildAge = grandchild.dateOfBirth ? calculateAge(grandchild.dateOfBirth) : null;
-            
-            console.log(`Inserting daughter ${i + 1}'s grandchild ${j + 1}:`, grandchild);
-            
-            const { error: grandchildError } = await supabase
-              .from('grandchildren')
-              .insert({
-                child_spouse_id: daughterSpouseData.id,
-                first_name: grandchild.firstName || null,
-                last_name: grandchild.lastName || null,
-                contact_number: grandchild.contactNumber || null,
-                date_of_birth: grandchild.dateOfBirth || null,
-                age: grandchildAge,
-                occupation: grandchild.occupation as any || null,
-                current_place: grandchild.currentPlace || null,
-                phone_number: grandchild.phoneNumber || null,
-                grandchild_index: j
-              });
-
-            if (grandchildError) {
-              console.error(`Daughter ${i + 1}'s grandchild ${j + 1} insertion error:`, grandchildError);
-              throw grandchildError;
-            }
-            
-            console.log(`Daughter ${i + 1}'s grandchild ${j + 1} inserted successfully`);
-          }
-        }
-      }
-    }
-
-    console.log('=== ALL DATA SAVED SUCCESSFULLY ===');
-    showToast('Success!', 'Family information has been saved to database successfully!');
     
-    // Clear form after successful submission
-    resetForm();
-    
-  } catch (error) {
-    console.error('=== FORM SUBMISSION ERROR ===', error);
-    showToast('Error', `Failed to save family information: ${(error as Error).message}`);
-  }
-}
-
-// Reset form after successful submission
-function resetForm() {
-  // Reset global data
-  familyData = {
-    familyHead: {
-      firstName: '',
-      lastName: '',
-      dateOfBirth: '',
-      nativePlace: '',
-      currentPlace: '',
-      contactNumber: '',
-      maritalStatus: '',
-      occupation: ''
-    },
-    spouse: {
-      firstName: '',
-      lastName: '',
-      dateOfBirth: '',
-      nativePlace: '',
-      currentPlace: '',
-      contactNumber: '',
-      maritalStatus: '',
-      occupation: '',
-      numberOfSons: 0,
-      numberOfDaughters: 0
-    },
-    sons: [],
-    daughters: []
+    if (type === 'sons') {
+      setSons(newChildren);
+    } else {
+      setDaughters(newChildren);
+    }
   };
-  
-  // Reset all form fields
-  const allInputs = document.querySelectorAll('input, select');
-  allInputs.forEach(input => {
-    if (input instanceof HTMLInputElement) {
-      input.value = '';
-    } else if (input instanceof HTMLSelectElement) {
-      input.selectedIndex = 0;
-    }
-  });
-  
-  // Hide sections
-  const spouseSection = document.getElementById('spouseSection');
-  const sonsSection = document.getElementById('sonsSection');
-  const daughtersSection = document.getElementById('daughtersSection');
-  
-  if (spouseSection) spouseSection.style.display = 'none';
-  if (sonsSection) sonsSection.style.display = 'none';
-  if (daughtersSection) daughtersSection.style.display = 'none';
-  
-  // Clear containers
-  const sonsContainer = document.getElementById('sonsContainer');
-  const daughtersContainer = document.getElementById('daughtersContainer');
-  
-  if (sonsContainer) sonsContainer.innerHTML = '';
-  if (daughtersContainer) daughtersContainer.innerHTML = '';
-  
-  console.log('Form reset completed');
-}
 
-// Initialize the application
-function init() {
-  console.log('=== INITIALIZING FAMILY FORM ===');
-  setupFamilyHeadEvents();
-  setupSpouseEvents();
-  
-  // Submit button event
-  const submitBtn = document.getElementById('submitBtn');
-  if (submitBtn) {
-    submitBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      console.log('Submit button clicked');
-      submitForm();
-    });
-    console.log('Submit button event listener attached');
-  } else {
-    console.error('Submit button not found!');
-  }
-  
-  console.log('Family form initialized successfully');
-}
-
-const FamilyForm = () => {
-  useEffect(() => {
-    // Wait for DOM to be ready
-    const timer = setTimeout(() => {
-      init();
-    }, 100);
+  const updateChild = (type: 'sons' | 'daughters', index: number, field: keyof PersonData, value: string) => {
+    const updateFunction = type === 'sons' ? setSons : setDaughters;
+    const currentChildren = type === 'sons' ? sons : daughters;
     
-    return () => clearTimeout(timer);
-  }, []);
+    updateFunction(prev => prev.map((child, i) => 
+      i === index 
+        ? { ...child, [field]: typeof value === 'string' ? value.toUpperCase() : value }
+        : child
+    ));
+  };
 
-  return null; // This component just adds functionality to the existing HTML
+  const submitForm = async () => {
+    console.log('=== STARTING FORM SUBMISSION ===');
+    console.log('Family head data:', familyHead);
+    console.log('Spouse data:', spouse);
+    console.log('Sons data:', sons);
+    console.log('Daughters data:', daughters);
+
+    // Basic validation
+    if (!familyHead.firstName || !familyHead.lastName || !familyHead.dateOfBirth) {
+      toast.error('Please fill in family head details');
+      return;
+    }
+
+    try {
+      // Calculate age for family head
+      const headAge = calculateAge(familyHead.dateOfBirth);
+      
+      // Insert family head
+      const { data: familyHeadData, error: familyHeadError } = await supabase
+        .from('family_heads')
+        .insert({
+          first_name: familyHead.firstName,
+          last_name: familyHead.lastName,
+          date_of_birth: familyHead.dateOfBirth,
+          age: headAge,
+          native_place: familyHead.nativePlace || null,
+          current_place: familyHead.currentPlace || null,
+          contact_number: familyHead.contactNumber || null,
+          marital_status: familyHead.maritalStatus as any,
+          occupation: familyHead.occupation as any || null
+        })
+        .select()
+        .single();
+
+      if (familyHeadError) {
+        console.error('Family head insertion error:', familyHeadError);
+        throw familyHeadError;
+      }
+
+      console.log('Family head inserted successfully:', familyHeadData);
+      const familyHeadId = familyHeadData.id;
+
+      // Insert spouse if married
+      if (familyHead.maritalStatus === 'married' && (spouse.firstName || spouse.lastName)) {
+        const spouseAge = spouse.dateOfBirth ? calculateAge(spouse.dateOfBirth) : null;
+        
+        const { error: spouseError } = await supabase
+          .from('spouses')
+          .insert({
+            family_head_id: familyHeadId,
+            first_name: spouse.firstName || null,
+            last_name: spouse.lastName || null,
+            date_of_birth: spouse.dateOfBirth || null,
+            age: spouseAge,
+            native_place: spouse.nativePlace || null,
+            contact_number: spouse.contactNumber || null,
+            occupation: spouse.occupation as any || null,
+            number_of_sons: spouse.numberOfSons || 0,
+            number_of_daughters: spouse.numberOfDaughters || 0
+          });
+
+        if (spouseError) {
+          console.error('Spouse insertion error:', spouseError);
+          throw spouseError;
+        }
+        console.log('Spouse inserted successfully');
+      }
+
+      // Insert children (sons and daughters)
+      const allChildren = [
+        ...sons.map((son, index) => ({ ...son, child_type: 'son', child_index: index })),
+        ...daughters.map((daughter, index) => ({ ...daughter, child_type: 'daughter', child_index: index }))
+      ];
+
+      for (const child of allChildren) {
+        if (!child.firstName && !child.lastName) continue;
+
+        const childAge = child.dateOfBirth ? calculateAge(child.dateOfBirth) : null;
+        
+        const { error: childError } = await supabase
+          .from('children')
+          .insert({
+            family_head_id: familyHeadId,
+            first_name: child.firstName || null,
+            last_name: child.lastName || null,
+            contact_number: child.contactNumber || null,
+            date_of_birth: child.dateOfBirth || null,
+            age: childAge,
+            occupation: child.occupation as any || null,
+            current_place: child.currentPlace || null,
+            phone_number: child.phoneNumber || null,
+            marital_status: child.maritalStatus as any || null,
+            child_type: child.child_type,
+            child_index: child.child_index
+          });
+
+        if (childError) {
+          console.error('Child insertion error:', childError);
+          throw childError;
+        }
+      }
+
+      console.log('=== ALL DATA SAVED SUCCESSFULLY ===');
+      toast.success('Family information has been saved successfully!');
+      
+      // Reset form
+      setFamilyHead({
+        firstName: '',
+        lastName: '',
+        dateOfBirth: '',
+        nativePlace: '',
+        currentPlace: '',
+        contactNumber: '',
+        maritalStatus: '',
+        occupation: ''
+      });
+      setSpouse({
+        firstName: '',
+        lastName: '',
+        dateOfBirth: '',
+        nativePlace: '',
+        currentPlace: '',
+        contactNumber: '',
+        maritalStatus: '',
+        occupation: '',
+        numberOfSons: 0,
+        numberOfDaughters: 0
+      });
+      setSons([]);
+      setDaughters([]);
+      
+    } catch (error) {
+      console.error('=== FORM SUBMISSION ERROR ===', error);
+      toast.error(`Failed to save family information: ${(error as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+      <form onSubmit={(e) => { e.preventDefault(); submitForm(); }}>
+        {/* Family Head Section */}
+        <div className="mb-8 p-6 border rounded-lg">
+          <h2 className="text-2xl font-bold mb-4 text-blue-800">Family Head Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name / पहिले नाव *
+              </label>
+              <input
+                type="text"
+                value={familyHead.firstName}
+                onChange={(e) => handleFamilyHeadChange('firstName', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name / आडनाव *
+              </label>
+              <input
+                type="text"
+                value={familyHead.lastName}
+                onChange={(e) => handleFamilyHeadChange('lastName', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date of Birth / जन्म तारीख *
+              </label>
+              <input
+                type="date"
+                value={familyHead.dateOfBirth}
+                onChange={(e) => handleFamilyHeadChange('dateOfBirth', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              {familyHead.dateOfBirth && (
+                <div className="text-sm text-gray-600 mt-1">
+                  Age: {calculateAge(familyHead.dateOfBirth)}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Native Place / मूळ गाव
+              </label>
+              <input
+                type="text"
+                value={familyHead.nativePlace}
+                onChange={(e) => handleFamilyHeadChange('nativePlace', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Place / सध्याचे ठिकाण
+              </label>
+              <input
+                type="text"
+                value={familyHead.currentPlace}
+                onChange={(e) => handleFamilyHeadChange('currentPlace', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Number / संपर्क क्रमांक
+              </label>
+              <input
+                type="text"
+                value={familyHead.contactNumber}
+                onChange={(e) => handleFamilyHeadChange('contactNumber', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+              />
+              {familyHead.contactNumber && !validateContactNumber(familyHead.contactNumber) && (
+                <div className="text-red-500 text-sm mt-1">
+                  Contact number must contain only numbers
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Marital Status / वैवाहिक स्थिती *
+              </label>
+              <select
+                value={familyHead.maritalStatus}
+                onChange={(e) => handleFamilyHeadChange('maritalStatus', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
+                <option value="single">Single / अविवाहित</option>
+                <option value="married">Married / विवाहित</option>
+                <option value="divorced">Divorced / घटस्फोटित</option>
+                <option value="widowed">Widowed / विधवा</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Occupation / व्यवसाय
+              </label>
+              <select
+                value={familyHead.occupation}
+                onChange={(e) => handleFamilyHeadChange('occupation', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select occupation / व्यवसाय निवडा</option>
+                <option value="retired">Retired / निवृत्त</option>
+                <option value="housewife">Housewife / गृहिणी</option>
+                <option value="salaried">Salaried / नोकरदार</option>
+                <option value="business">Business / व्यवसाय</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Spouse Section */}
+        {familyHead.maritalStatus === 'married' && (
+          <div className="mb-8 p-6 border rounded-lg">
+            <h2 className="text-2xl font-bold mb-4 text-blue-800">Spouse Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name / पहिले नाव
+                </label>
+                <input
+                  type="text"
+                  value={spouse.firstName}
+                  onChange={(e) => handleSpouseChange('firstName', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name / आडनाव
+                </label>
+                <input
+                  type="text"
+                  value={spouse.lastName}
+                  onChange={(e) => handleSpouseChange('lastName', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date of Birth / जन्म तारीख
+                </label>
+                <input
+                  type="date"
+                  value={spouse.dateOfBirth}
+                  onChange={(e) => handleSpouseChange('dateOfBirth', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {spouse.dateOfBirth && (
+                  <div className="text-sm text-gray-600 mt-1">
+                    Age: {calculateAge(spouse.dateOfBirth)}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Native Place / मूळ गाव
+                </label>
+                <input
+                  type="text"
+                  value={spouse.nativePlace}
+                  onChange={(e) => handleSpouseChange('nativePlace', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contact Number / संपर्क क्रमांक
+                </label>
+                <input
+                  type="text"
+                  value={spouse.contactNumber}
+                  onChange={(e) => handleSpouseChange('contactNumber', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Occupation / व्यवसाय
+                </label>
+                <select
+                  value={spouse.occupation}
+                  onChange={(e) => handleSpouseChange('occupation', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select occupation / व्यवसाय निवडा</option>
+                  <option value="retired">Retired / निवृत्त</option>
+                  <option value="housewife">Housewife / गृहिणी</option>
+                  <option value="salaried">Salaried / नोकरदार</option>
+                  <option value="business">Business / व्यवसाय</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Sons / मुलांची संख्या
+                </label>
+                <select
+                  value={spouse.numberOfSons || 0}
+                  onChange={(e) => {
+                    const count = parseInt(e.target.value);
+                    handleSpouseChange('numberOfSons', count);
+                    generateChildrenForms('sons', count);
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {[...Array(11)].map((_, i) => (
+                    <option key={i} value={i}>{i}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Daughters / मुलींची संख्या
+                </label>
+                <select
+                  value={spouse.numberOfDaughters || 0}
+                  onChange={(e) => {
+                    const count = parseInt(e.target.value);
+                    handleSpouseChange('numberOfDaughters', count);
+                    generateChildrenForms('daughters', count);
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {[...Array(11)].map((_, i) => (
+                    <option key={i} value={i}>{i}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sons Section */}
+        {sons.length > 0 && (
+          <div className="mb-8 p-6 border rounded-lg">
+            <h2 className="text-2xl font-bold mb-4 text-blue-800">Sons Information</h2>
+            {sons.map((son, index) => (
+              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Son {index + 1}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name / पहिले नाव
+                    </label>
+                    <input
+                      type="text"
+                      value={son.firstName}
+                      onChange={(e) => updateChild('sons', index, 'firstName', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name / आडनाव
+                    </label>
+                    <input
+                      type="text"
+                      value={son.lastName}
+                      onChange={(e) => updateChild('sons', index, 'lastName', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Date of Birth / जन्म तारीख
+                    </label>
+                    <input
+                      type="date"
+                      value={son.dateOfBirth}
+                      onChange={(e) => updateChild('sons', index, 'dateOfBirth', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {son.dateOfBirth && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        Age: {calculateAge(son.dateOfBirth)}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Number / संपर्क क्रमांक
+                    </label>
+                    <input
+                      type="text"
+                      value={son.contactNumber}
+                      onChange={(e) => updateChild('sons', index, 'contactNumber', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Place / सध्याचे ठिकाण
+                    </label>
+                    <input
+                      type="text"
+                      value={son.currentPlace}
+                      onChange={(e) => updateChild('sons', index, 'currentPlace', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number / फोन नंबर
+                    </label>
+                    <input
+                      type="text"
+                      value={son.phoneNumber || ''}
+                      onChange={(e) => updateChild('sons', index, 'phoneNumber', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Occupation / व्यवसाय
+                    </label>
+                    <select
+                      value={son.occupation}
+                      onChange={(e) => updateChild('sons', index, 'occupation', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select occupation / व्यवसाय निवडा</option>
+                      <option value="salaried">Salaried / नोकरदार</option>
+                      <option value="business">Business / व्यवसाय</option>
+                      <option value="student">Student / विद्यार्थी</option>
+                      <option value="unemployed">Unemployed / बेरोजगार</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Marital Status / वैवाहिक स्थिती
+                    </label>
+                    <select
+                      value={son.maritalStatus}
+                      onChange={(e) => updateChild('sons', index, 'maritalStatus', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
+                      <option value="single">Single / अविवाहित</option>
+                      <option value="married">Married / विवाहित</option>
+                      <option value="divorced">Divorced / घटस्फोटित</option>
+                      <option value="widowed">Widowed / विधवा</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Daughters Section */}
+        {daughters.length > 0 && (
+          <div className="mb-8 p-6 border rounded-lg">
+            <h2 className="text-2xl font-bold mb-4 text-blue-800">Daughters Information</h2>
+            {daughters.map((daughter, index) => (
+              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Daughter {index + 1}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name / पहिले नाव
+                    </label>
+                    <input
+                      type="text"
+                      value={daughter.firstName}
+                      onChange={(e) => updateChild('daughters', index, 'firstName', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name / आडनाव
+                    </label>
+                    <input
+                      type="text"
+                      value={daughter.lastName}
+                      onChange={(e) => updateChild('daughters', index, 'lastName', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Date of Birth / जन्म तारीख
+                    </label>
+                    <input
+                      type="date"
+                      value={daughter.dateOfBirth}
+                      onChange={(e) => updateChild('daughters', index, 'dateOfBirth', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {daughter.dateOfBirth && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        Age: {calculateAge(daughter.dateOfBirth)}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Number / संपर्क क्रमांक
+                    </label>
+                    <input
+                      type="text"
+                      value={daughter.contactNumber}
+                      onChange={(e) => updateChild('daughters', index, 'contactNumber', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Place / सध्याचे ठिकाण
+                    </label>
+                    <input
+                      type="text"
+                      value={daughter.currentPlace}
+                      onChange={(e) => updateChild('daughters', index, 'currentPlace', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number / फोन नंबर
+                    </label>
+                    <input
+                      type="text"
+                      value={daughter.phoneNumber || ''}
+                      onChange={(e) => updateChild('daughters', index, 'phoneNumber', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Occupation / व्यवसाय
+                    </label>
+                    <select
+                      value={daughter.occupation}
+                      onChange={(e) => updateChild('daughters', index, 'occupation', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select occupation / व्यवसाय निवडा</option>
+                      <option value="salaried">Salaried / नोकरदार</option>
+                      <option value="business">Business / व्यवसाय</option>
+                      <option value="student">Student / विद्यार्थी</option>
+                      <option value="unemployed">Unemployed / बेरोजगार</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Marital Status / वैवाहिक स्थिती
+                    </label>
+                    <select
+                      value={daughter.maritalStatus}
+                      onChange={(e) => updateChild('daughters', index, 'maritalStatus', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
+                      <option value="single">Single / अविवाहित</option>
+                      <option value="married">Married / विवाहित</option>
+                      <option value="divorced">Divorced / घटस्फोटित</option>
+                      <option value="widowed">Widowed / विधवा</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="text-center">
+          <button
+            type="submit"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105"
+          >
+            Submit Family Information / कुटुंब माहिती सबमिट करा
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 };
 
 export default FamilyForm;
