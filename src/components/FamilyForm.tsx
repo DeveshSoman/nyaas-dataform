@@ -359,29 +359,36 @@ const FamilyForm = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      {/* Download Button */}
-      <div className="mb-6 flex justify-end">
-        <Button
-          onClick={handleDownloadRequest}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <Download size={16} />
-          Download CSV
-        </Button>
+    <div className="max-w-4xl mx-auto p-6 bg-background rounded-lg shadow-lg">
+      {/* Download Button - Make it more prominent */}
+      <div className="mb-8 p-4 bg-muted rounded-lg border-2 border-primary/20">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-1">Export Data</h3>
+            <p className="text-sm text-muted-foreground">Download all family data in CSV format</p>
+          </div>
+          <Button
+            onClick={handleDownloadRequest}
+            variant="default"
+            size="lg"
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+          >
+            <Download size={20} />
+            Download CSV
+          </Button>
+        </div>
       </div>
 
       {/* Password Dialog */}
       {showPasswordDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Enter Password</h3>
+          <div className="bg-background p-6 rounded-lg shadow-lg max-w-sm w-full mx-4 border">
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Enter Password</h3>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+              className="w-full p-3 border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-transparent mb-4 bg-background text-foreground"
               placeholder="Enter password"
               onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
             />
