@@ -1,45 +1,15 @@
+
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-
-// Type definitions
-interface PersonData {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  nativePlace: string;
-  currentPlace: string;
-  contactNumber: string;
-  maritalStatus: string;
-  occupation: string;
-  numberOfSons?: number;
-  numberOfDaughters?: number;
-  phoneNumber?: string;
-  spouse?: SpouseData | null;
-}
-
-interface SpouseData {
-  firstName: string;
-  lastName: string;
-  contactNumber: string;
-  nativePlace: string;
-  dateOfBirth: string;
-  occupation: string;
-  numberOfChildren: number;
-  grandchildren: GrandchildData[];
-}
-
-interface GrandchildData {
-  firstName: string;
-  lastName: string;
-  contactNumber: string;
-  dateOfBirth: string;
-  occupation: string;
-  currentPlace: string;
-  phoneNumber: string;
-}
+import { PersonData } from '@/types/family';
+import { calculateAge } from '@/utils/familyFormUtils';
+import { downloadFormData } from '@/utils/csvExporter';
+import FamilyHeadSection from '@/components/family/FamilyHeadSection';
+import SpouseSection from '@/components/family/SpouseSection';
+import ChildrenSection from '@/components/family/ChildrenSection';
+import PasswordDialog from '@/components/family/PasswordDialog';
+import ExportSection from '@/components/family/ExportSection';
 
 const FamilyForm = () => {
   const [familyHead, setFamilyHead] = useState<PersonData>({
@@ -71,27 +41,6 @@ const FamilyForm = () => {
 
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
-
-  // Utility functions
-  const calculateAge = (birthDate: string): number => {
-    if (!birthDate) return 0;
-    
-    const today = new Date();
-    const birth = new Date(birthDate);
-    
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const validateContactNumber = (number: string): boolean => {
-    return /^\d+$/.test(number);
-  };
 
   const handleFamilyHeadChange = (field: keyof PersonData, value: string | number) => {
     setFamilyHead(prev => ({
@@ -133,7 +82,6 @@ const FamilyForm = () => {
 
   const updateChild = (type: 'sons' | 'daughters', index: number, field: keyof PersonData, value: string) => {
     const updateFunction = type === 'sons' ? setSons : setDaughters;
-    const currentChildren = type === 'sons' ? sons : daughters;
     
     updateFunction(prev => prev.map((child, i) => 
       i === index 
@@ -291,617 +239,52 @@ const FamilyForm = () => {
     }
     
     setShowPasswordDialog(false);
-    await downloadFormData();
-  };
-
-  const downloadFormData = async () => {
     try {
-      // Fetch all data from Supabase
-      const { data: familyHeads, error: familyHeadsError } = await supabase
-        .from('family_heads')
-        .select('*');
-      
-      if (familyHeadsError) throw familyHeadsError;
-
-      const { data: spouses, error: spousesError } = await supabase
-        .from('spouses')
-        .select('*');
-      
-      if (spousesError) throw spousesError;
-
-      const { data: children, error: childrenError } = await supabase
-        .from('children')
-        .select('*');
-      
-      if (childrenError) throw childrenError;
-
-      // Create CSV content
-      let csvContent = '';
-      
-      // Family Heads CSV
-      csvContent += 'FAMILY HEADS\n';
-      csvContent += 'ID,First Name,Last Name,Date of Birth,Age,Native Place,Current Place,Contact Number,Marital Status,Occupation,Created At\n';
-      
-      familyHeads?.forEach(head => {
-        csvContent += `"${head.id}","${head.first_name || ''}","${head.last_name || ''}","${head.date_of_birth || ''}","${head.age || ''}","${head.native_place || ''}","${head.current_place || ''}","${head.contact_number || ''}","${head.marital_status || ''}","${head.occupation || ''}","${head.created_at}"\n`;
-      });
-
-      csvContent += '\n\nSPOUSES\n';
-      csvContent += 'ID,Family Head ID,First Name,Last Name,Date of Birth,Age,Native Place,Contact Number,Occupation,Number of Sons,Number of Daughters,Created At\n';
-      
-      spouses?.forEach(spouse => {
-        csvContent += `"${spouse.id}","${spouse.family_head_id}","${spouse.first_name || ''}","${spouse.last_name || ''}","${spouse.date_of_birth || ''}","${spouse.age || ''}","${spouse.native_place || ''}","${spouse.contact_number || ''}","${spouse.occupation || ''}","${spouse.number_of_sons || 0}","${spouse.number_of_daughters || 0}","${spouse.created_at}"\n`;
-      });
-
-      csvContent += '\n\nCHILDREN\n';
-      csvContent += 'ID,Family Head ID,First Name,Last Name,Date of Birth,Age,Contact Number,Current Place,Phone Number,Occupation,Marital Status,Child Type,Child Index,Created At\n';
-      
-      children?.forEach(child => {
-        csvContent += `"${child.id}","${child.family_head_id}","${child.first_name || ''}","${child.last_name || ''}","${child.date_of_birth || ''}","${child.age || ''}","${child.contact_number || ''}","${child.current_place || ''}","${child.phone_number || ''}","${child.occupation || ''}","${child.marital_status || ''}","${child.child_type || ''}","${child.child_index || ''}","${child.created_at}"\n`;
-      });
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `family_data_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+      await downloadFormData();
       toast.success('Family data downloaded successfully!');
     } catch (error) {
-      console.error('Download error:', error);
       toast.error('Failed to download data');
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-background rounded-lg shadow-lg">
-      {/* Download Button - Make it more prominent */}
-      <div className="mb-8 p-4 bg-muted rounded-lg border-2 border-primary/20">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">Export Data</h3>
-            <p className="text-sm text-muted-foreground">Download all family data in CSV format</p>
-          </div>
-          <Button
-            onClick={handleDownloadRequest}
-            variant="default"
-            size="lg"
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-          >
-            <Download size={20} />
-            Download CSV
-          </Button>
-        </div>
-      </div>
+      <ExportSection onDownloadRequest={handleDownloadRequest} />
 
-      {/* Password Dialog */}
-      {showPasswordDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background p-6 rounded-lg shadow-lg max-w-sm w-full mx-4 border">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">Enter Password</h3>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-transparent mb-4 bg-background text-foreground"
-              placeholder="Enter password"
-              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-            />
-            <div className="flex gap-2 justify-end">
-              <Button
-                onClick={() => setShowPasswordDialog(false)}
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button onClick={handlePasswordSubmit}>
-                Download
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PasswordDialog
+        isOpen={showPasswordDialog}
+        password={password}
+        onPasswordChange={setPassword}
+        onSubmit={handlePasswordSubmit}
+        onCancel={() => setShowPasswordDialog(false)}
+      />
 
       <form onSubmit={(e) => { e.preventDefault(); submitForm(); }}>
-        {/* Family Head Section */}
-        <div className="mb-8 p-6 border rounded-lg">
-          <h2 className="text-2xl font-bold mb-4 text-blue-800">Family Head Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                First Name / पहिले नाव *
-              </label>
-              <input
-                type="text"
-                value={familyHead.firstName}
-                onChange={(e) => handleFamilyHeadChange('firstName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name / आडनाव *
-              </label>
-              <input
-                type="text"
-                value={familyHead.lastName}
-                onChange={(e) => handleFamilyHeadChange('lastName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth / जन्म तारीख *
-              </label>
-              <input
-                type="date"
-                value={familyHead.dateOfBirth}
-                onChange={(e) => handleFamilyHeadChange('dateOfBirth', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-              {familyHead.dateOfBirth && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Age: {calculateAge(familyHead.dateOfBirth)}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Native Place / मूळ गाव
-              </label>
-              <input
-                type="text"
-                value={familyHead.nativePlace}
-                onChange={(e) => handleFamilyHeadChange('nativePlace', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Current Place / सध्याचे ठिकाण
-              </label>
-              <input
-                type="text"
-                value={familyHead.currentPlace}
-                onChange={(e) => handleFamilyHeadChange('currentPlace', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Number / संपर्क क्रमांक
-              </label>
-              <input
-                type="text"
-                value={familyHead.contactNumber}
-                onChange={(e) => handleFamilyHeadChange('contactNumber', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-              />
-              {familyHead.contactNumber && !validateContactNumber(familyHead.contactNumber) && (
-                <div className="text-red-500 text-sm mt-1">
-                  Contact number must contain only numbers
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Marital Status / वैवाहिक स्थिती *
-              </label>
-              <select
-                value={familyHead.maritalStatus}
-                onChange={(e) => handleFamilyHeadChange('maritalStatus', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                <option value="single">Single / अविवाहित</option>
-                <option value="married">Married / विवाहित</option>
-                <option value="divorced">Divorced / घटस्फोटित</option>
-                <option value="widowed">Widowed / विधवा</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Occupation / व्यवसाय
-              </label>
-              <select
-                value={familyHead.occupation}
-                onChange={(e) => handleFamilyHeadChange('occupation', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select occupation / व्यवसाय निवडा</option>
-                <option value="retired">Retired / निवृत्त</option>
-                <option value="housewife">Housewife / गृहिणी</option>
-                <option value="salaried">Salaried / नोकरदार</option>
-                <option value="business">Business / व्यवसाय</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <FamilyHeadSection
+          familyHead={familyHead}
+          onFamilyHeadChange={handleFamilyHeadChange}
+        />
 
-        {/* Spouse Section */}
         {familyHead.maritalStatus === 'married' && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Spouse Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name / पहिले नाव
-                </label>
-                <input
-                  type="text"
-                  value={spouse.firstName}
-                  onChange={(e) => handleSpouseChange('firstName', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name / आडनाव
-                </label>
-                <input
-                  type="text"
-                  value={spouse.lastName}
-                  onChange={(e) => handleSpouseChange('lastName', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date of Birth / जन्म तारीख
-                </label>
-                <input
-                  type="date"
-                  value={spouse.dateOfBirth}
-                  onChange={(e) => handleSpouseChange('dateOfBirth', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {spouse.dateOfBirth && (
-                  <div className="text-sm text-gray-600 mt-1">
-                    Age: {calculateAge(spouse.dateOfBirth)}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Native Place / मूळ गाव
-                </label>
-                <input
-                  type="text"
-                  value={spouse.nativePlace}
-                  onChange={(e) => handleSpouseChange('nativePlace', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Number / संपर्क क्रमांक
-                </label>
-                <input
-                  type="text"
-                  value={spouse.contactNumber}
-                  onChange={(e) => handleSpouseChange('contactNumber', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Occupation / व्यवसाय
-                </label>
-                <select
-                  value={spouse.occupation}
-                  onChange={(e) => handleSpouseChange('occupation', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select occupation / व्यवसाय निवडा</option>
-                  <option value="retired">Retired / निवृत्त</option>
-                  <option value="housewife">Housewife / गृहिणी</option>
-                  <option value="salaried">Salaried / नोकरदार</option>
-                  <option value="business">Business / व्यवसाय</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Sons / मुलांची संख्या
-                </label>
-                <select
-                  value={spouse.numberOfSons || 0}
-                  onChange={(e) => {
-                    const count = parseInt(e.target.value);
-                    handleSpouseChange('numberOfSons', count);
-                    generateChildrenForms('sons', count);
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {[...Array(11)].map((_, i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Daughters / मुलींची संख्या
-                </label>
-                <select
-                  value={spouse.numberOfDaughters || 0}
-                  onChange={(e) => {
-                    const count = parseInt(e.target.value);
-                    handleSpouseChange('numberOfDaughters', count);
-                    generateChildrenForms('daughters', count);
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {[...Array(11)].map((_, i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          <SpouseSection
+            spouse={spouse}
+            onSpouseChange={handleSpouseChange}
+            onChildrenCountChange={generateChildrenForms}
+          />
         )}
 
-        {/* Sons Section */}
-        {sons.length > 0 && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Sons Information</h2>
-            {sons.map((son, index) => (
-              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Son {index + 1}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name / पहिले नाव
-                    </label>
-                    <input
-                      type="text"
-                      value={son.firstName}
-                      onChange={(e) => updateChild('sons', index, 'firstName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name / आडनाव
-                    </label>
-                    <input
-                      type="text"
-                      value={son.lastName}
-                      onChange={(e) => updateChild('sons', index, 'lastName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Birth / जन्म तारीख
-                    </label>
-                    <input
-                      type="date"
-                      value={son.dateOfBirth}
-                      onChange={(e) => updateChild('sons', index, 'dateOfBirth', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {son.dateOfBirth && (
-                      <div className="text-sm text-gray-600 mt-1">
-                        Age: {calculateAge(son.dateOfBirth)}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Number / संपर्क क्रमांक
-                    </label>
-                    <input
-                      type="text"
-                      value={son.contactNumber}
-                      onChange={(e) => updateChild('sons', index, 'contactNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Place / सध्याचे ठिकाण
-                    </label>
-                    <input
-                      type="text"
-                      value={son.currentPlace}
-                      onChange={(e) => updateChild('sons', index, 'currentPlace', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number / फोन नंबर
-                    </label>
-                    <input
-                      type="text"
-                      value={son.phoneNumber || ''}
-                      onChange={(e) => updateChild('sons', index, 'phoneNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Occupation / व्यवसाय
-                    </label>
-                    <select
-                      value={son.occupation}
-                      onChange={(e) => updateChild('sons', index, 'occupation', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select occupation / व्यवसाय निवडा</option>
-                      <option value="salaried">Salaried / नोकरदार</option>
-                      <option value="business">Business / व्यवसाय</option>
-                      <option value="student">Student / विद्यार्थी</option>
-                      <option value="unemployed">Unemployed / बेरोजगार</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Marital Status / वैवाहिक स्थिती
-                    </label>
-                    <select
-                      value={son.maritalStatus}
-                      onChange={(e) => updateChild('sons', index, 'maritalStatus', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                      <option value="single">Single / अविवाहित</option>
-                      <option value="married">Married / विवाहित</option>
-                      <option value="divorced">Divorced / घटस्फोटित</option>
-                      <option value="widowed">Widowed / विधवा</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <ChildrenSection
+          children={sons}
+          childType="sons"
+          onChildUpdate={(index, field, value) => updateChild('sons', index, field, value)}
+        />
 
-        {/* Daughters Section */}
-        {daughters.length > 0 && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Daughters Information</h2>
-            {daughters.map((daughter, index) => (
-              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Daughter {index + 1}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name / पहिले नाव
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.firstName}
-                      onChange={(e) => updateChild('daughters', index, 'firstName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name / आडनाव
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.lastName}
-                      onChange={(e) => updateChild('daughters', index, 'lastName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Birth / जन्म तारीख
-                    </label>
-                    <input
-                      type="date"
-                      value={daughter.dateOfBirth}
-                      onChange={(e) => updateChild('daughters', index, 'dateOfBirth', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {daughter.dateOfBirth && (
-                      <div className="text-sm text-gray-600 mt-1">
-                        Age: {calculateAge(daughter.dateOfBirth)}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Number / संपर्क क्रमांक
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.contactNumber}
-                      onChange={(e) => updateChild('daughters', index, 'contactNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Place / सध्याचे ठिकाण
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.currentPlace}
-                      onChange={(e) => updateChild('daughters', index, 'currentPlace', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number / फोन नंबर
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.phoneNumber || ''}
-                      onChange={(e) => updateChild('daughters', index, 'phoneNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Occupation / व्यवसाय
-                    </label>
-                    <select
-                      value={daughter.occupation}
-                      onChange={(e) => updateChild('daughters', index, 'occupation', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select occupation / व्यवसाय निवडा</option>
-                      <option value="salaried">Salaried / नोकरदार</option>
-                      <option value="business">Business / व्यवसाय</option>
-                      <option value="student">Student / विद्यार्थी</option>
-                      <option value="unemployed">Unemployed / बेरोजगार</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Marital Status / वैवाहिक स्थिती
-                    </label>
-                    <select
-                      value={daughter.maritalStatus}
-                      onChange={(e) => updateChild('daughters', index, 'maritalStatus', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                      <option value="single">Single / अविवाहित</option>
-                      <option value="married">Married / विवाहित</option>
-                      <option value="divorced">Divorced / घटस्फोटित</option>
-                      <option value="widowed">Widowed / विधवा</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <ChildrenSection
+          children={daughters}
+          childType="daughters"
+          onChildUpdate={(index, field, value) => updateChild('daughters', index, field, value)}
+        />
 
-        {/* Submit Button */}
         <div className="text-center">
           <button
             type="submit"
