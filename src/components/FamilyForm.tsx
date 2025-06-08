@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // Type definitions
 interface PersonData {
@@ -89,6 +90,15 @@ const FamilyForm = () => {
     return age;
   };
 
+  const formatDateToDDMMYYYY = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const validateContactNumber = (number: string): boolean => {
     return /^\d+$/.test(number);
   };
@@ -133,7 +143,6 @@ const FamilyForm = () => {
 
   const updateChild = (type: 'sons' | 'daughters', index: number, field: keyof PersonData, value: string) => {
     const updateFunction = type === 'sons' ? setSons : setDaughters;
-    const currentChildren = type === 'sons' ? sons : daughters;
     
     updateFunction(prev => prev.map((child, i) => 
       i === index 
@@ -159,7 +168,7 @@ const FamilyForm = () => {
       // Calculate age for family head
       const headAge = calculateAge(familyHead.dateOfBirth);
       
-      // Insert family head
+      // Insert family head with proper error handling
       const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
         .insert({
@@ -315,37 +324,74 @@ const FamilyForm = () => {
       
       if (childrenError) throw childrenError;
 
-      // Create CSV content
-      let csvContent = '';
-      
-      // Family Heads CSV
-      csvContent += 'FAMILY HEADS\n';
-      csvContent += 'ID,First Name,Last Name,Date of Birth,Age,Native Place,Current Place,Contact Number,Marital Status,Occupation,Created At\n';
-      
-      familyHeads?.forEach(head => {
-        csvContent += `"${head.id}","${head.first_name || ''}","${head.last_name || ''}","${head.date_of_birth || ''}","${head.age || ''}","${head.native_place || ''}","${head.current_place || ''}","${head.contact_number || ''}","${head.marital_status || ''}","${head.occupation || ''}","${head.created_at}"\n`;
-      });
+      // Format data for Excel with dd/mm/yyyy dates
+      const familyHeadsFormatted = familyHeads?.map(head => ({
+        ID: head.id,
+        'First Name': head.first_name || '',
+        'Last Name': head.last_name || '',
+        'Date of Birth': formatDateToDDMMYYYY(head.date_of_birth),
+        Age: head.age || '',
+        'Native Place': head.native_place || '',
+        'Current Place': head.current_place || '',
+        'Contact Number': head.contact_number || '',
+        'Marital Status': head.marital_status || '',
+        Occupation: head.occupation || '',
+        'Created At': formatDateToDDMMYYYY(head.created_at)
+      })) || [];
 
-      csvContent += '\n\nSPOUSES\n';
-      csvContent += 'ID,Family Head ID,First Name,Last Name,Date of Birth,Age,Native Place,Contact Number,Occupation,Number of Sons,Number of Daughters,Created At\n';
-      
-      spouses?.forEach(spouse => {
-        csvContent += `"${spouse.id}","${spouse.family_head_id}","${spouse.first_name || ''}","${spouse.last_name || ''}","${spouse.date_of_birth || ''}","${spouse.age || ''}","${spouse.native_place || ''}","${spouse.contact_number || ''}","${spouse.occupation || ''}","${spouse.number_of_sons || 0}","${spouse.number_of_daughters || 0}","${spouse.created_at}"\n`;
-      });
+      const spousesFormatted = spouses?.map(spouse => ({
+        ID: spouse.id,
+        'Family Head ID': spouse.family_head_id,
+        'First Name': spouse.first_name || '',
+        'Last Name': spouse.last_name || '',
+        'Date of Birth': formatDateToDDMMYYYY(spouse.date_of_birth),
+        Age: spouse.age || '',
+        'Native Place': spouse.native_place || '',
+        'Contact Number': spouse.contact_number || '',
+        Occupation: spouse.occupation || '',
+        'Number of Sons': spouse.number_of_sons || 0,
+        'Number of Daughters': spouse.number_of_daughters || 0,
+        'Created At': formatDateToDDMMYYYY(spouse.created_at)
+      })) || [];
 
-      csvContent += '\n\nCHILDREN\n';
-      csvContent += 'ID,Family Head ID,First Name,Last Name,Date of Birth,Age,Contact Number,Current Place,Phone Number,Occupation,Marital Status,Child Type,Child Index,Created At\n';
-      
-      children?.forEach(child => {
-        csvContent += `"${child.id}","${child.family_head_id}","${child.first_name || ''}","${child.last_name || ''}","${child.date_of_birth || ''}","${child.age || ''}","${child.contact_number || ''}","${child.current_place || ''}","${child.phone_number || ''}","${child.occupation || ''}","${child.marital_status || ''}","${child.child_type || ''}","${child.child_index || ''}","${child.created_at}"\n`;
-      });
+      const childrenFormatted = children?.map(child => ({
+        ID: child.id,
+        'Family Head ID': child.family_head_id,
+        'First Name': child.first_name || '',
+        'Last Name': child.last_name || '',
+        'Date of Birth': formatDateToDDMMYYYY(child.date_of_birth),
+        Age: child.age || '',
+        'Contact Number': child.contact_number || '',
+        'Current Place': child.current_place || '',
+        'Phone Number': child.phone_number || '',
+        Occupation: child.occupation || '',
+        'Marital Status': child.marital_status || '',
+        'Child Type': child.child_type || '',
+        'Child Index': child.child_index || '',
+        'Created At': formatDateToDDMMYYYY(child.created_at)
+      })) || [];
 
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Add worksheets
+      const familyHeadsSheet = XLSX.utils.json_to_sheet(familyHeadsFormatted);
+      const spousesSheet = XLSX.utils.json_to_sheet(spousesFormatted);
+      const childrenSheet = XLSX.utils.json_to_sheet(childrenFormatted);
+      
+      XLSX.utils.book_append_sheet(workbook, familyHeadsSheet, 'Family Heads');
+      XLSX.utils.book_append_sheet(workbook, spousesSheet, 'Spouses');
+      XLSX.utils.book_append_sheet(workbook, childrenSheet, 'Children');
+
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      // Download file
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `family_data_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `family_data_${new Date().toISOString().split('T')[0]}.xlsx`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -365,7 +411,7 @@ const FamilyForm = () => {
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-1">Export Data</h3>
-            <p className="text-sm text-muted-foreground">Download all family data in CSV format</p>
+            <p className="text-sm text-muted-foreground">Download all family data in Excel format</p>
           </div>
           <Button
             onClick={handleDownloadRequest}
@@ -374,7 +420,7 @@ const FamilyForm = () => {
             className="flex items-center gap-2 bg-primary hover:bg-primary/90"
           >
             <Download size={20} />
-            Download CSV
+            Download Excel
           </Button>
         </div>
       </div>
@@ -902,12 +948,20 @@ const FamilyForm = () => {
         )}
 
         {/* Submit Button */}
-        <div className="text-center">
+        <div className="text-center flex gap-4 justify-center">
           <button
             type="submit"
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105"
           >
             Submit Family Information / कुटुंब माहिती सबमिट करा
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadRequest}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105 flex items-center gap-2"
+          >
+            <Download size={20} />
+            Download Data / डेटा डाउनलोड करा
           </button>
         </div>
       </form>
