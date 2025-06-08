@@ -947,24 +947,22 @@ const FamilyForm = () => {
           </div>
         )}
 
-        {/* Submit Button Section - Updated styling */}
-        <div className="text-center">
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
-              type="submit"
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg transition duration-200 transform hover:scale-105 shadow-lg"
-            >
-              Submit Family Information / कुटुंब माहिती सबमिट करा
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadRequest}
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg transition duration-200 transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
-            >
-              <Download size={20} />
-              Download Data / डेटा डाउनलोड करा
-            </button>
-          </div>
+        {/* Submit Button */}
+        <div className="text-center flex gap-4 justify-center">
+          <button
+            type="submit"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105"
+          >
+            Submit Family Information / कुटुंब माहिती सबमिट करा
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadRequest}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105 flex items-center gap-2"
+          >
+            <Download size={20} />
+            Download Data / डेटा डाउनलोड करा
+          </button>
         </div>
       </form>
     </div>
