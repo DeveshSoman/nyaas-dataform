@@ -1,970 +1,654 @@
-import React, { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { calculateAge } from '@/utils/ageCalculator';
+import ExportButton from './ExportButton';
 
-// Type definitions
-interface PersonData {
+interface FamilyHead {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
+  age: number | null;
+  contactNumber: string;
   nativePlace: string;
   currentPlace: string;
-  contactNumber: string;
   maritalStatus: string;
   occupation: string;
-  numberOfSons?: number;
-  numberOfDaughters?: number;
-  phoneNumber?: string;
-  spouse?: SpouseData | null;
 }
 
-interface SpouseData {
+interface Spouse {
   firstName: string;
   lastName: string;
+  dateOfBirth: string;
+  age: number | null;
   contactNumber: string;
   nativePlace: string;
-  dateOfBirth: string;
   occupation: string;
-  numberOfChildren: number;
-  grandchildren: GrandchildData[];
+  numberOfSons: number;
+  numberOfDaughters: number;
 }
 
-interface GrandchildData {
+interface Child {
   firstName: string;
   lastName: string;
-  contactNumber: string;
   dateOfBirth: string;
+  age: number | null;
+  contactNumber: string;
   occupation: string;
   currentPlace: string;
   phoneNumber: string;
+  maritalStatus: string;
+  childType: 'sons' | 'daughters';
+  childIndex: number;
 }
 
+const initialFamilyHead: FamilyHead = {
+  firstName: '',
+  lastName: '',
+  dateOfBirth: '',
+  age: null,
+  contactNumber: '',
+  nativePlace: '',
+  currentPlace: '',
+  maritalStatus: '',
+  occupation: '',
+};
+
+const initialSpouse: Spouse = {
+  firstName: '',
+  lastName: '',
+  dateOfBirth: '',
+  age: null,
+  contactNumber: '',
+  nativePlace: '',
+  occupation: '',
+  numberOfSons: 0,
+  numberOfDaughters: 0,
+};
+
 const FamilyForm = () => {
-  const [familyHead, setFamilyHead] = useState<PersonData>({
-    firstName: '',
-    lastName: '',
-    dateOfBirth: '',
-    nativePlace: '',
-    currentPlace: '',
-    contactNumber: '',
-    maritalStatus: '',
-    occupation: ''
-  });
+  const [familyHead, setFamilyHead] = useState<FamilyHead>(initialFamilyHead);
+  const [spouse, setSpouse] = useState<Spouse>(initialSpouse);
+  const [sons, setSons] = useState<Child[]>([]);
+  const [daughters, setDaughters] = useState<Child[]>([]);
+  const [showSpouseSection, setShowSpouseSection] = useState(false);
+  const [numberOfSons, setNumberOfSons] = useState(0);
+  const [numberOfDaughters, setNumberOfDaughters] = useState(0);
 
-  const [spouse, setSpouse] = useState<PersonData>({
-    firstName: '',
-    lastName: '',
-    dateOfBirth: '',
-    nativePlace: '',
-    currentPlace: '',
-    contactNumber: '',
-    maritalStatus: '',
-    occupation: '',
-    numberOfSons: 0,
-    numberOfDaughters: 0
-  });
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, entity: 'familyHead' | 'spouse', field: keyof FamilyHead | keyof Spouse) => {
+    const value = e.target.value;
 
-  const [sons, setSons] = useState<PersonData[]>([]);
-  const [daughters, setDaughters] = useState<PersonData[]>([]);
-
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [password, setPassword] = useState('');
-
-  // Utility functions
-  const calculateAge = (birthDate: string): number => {
-    if (!birthDate) return 0;
-    
-    const today = new Date();
-    const birth = new Date(birthDate);
-    
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
+    if (entity === 'familyHead') {
+      setFamilyHead(prev => ({ ...prev, [field]: value }));
+    } else if (entity === 'spouse') {
+      setSpouse(prev => ({ ...prev, [field]: value }));
     }
-    
-    return age;
   };
 
-  const formatDateToDDMMYYYY = (dateString: string): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+  const handleChildInputChange = (index: number, field: keyof Child, value: string, childType: 'sons' | 'daughters') => {
+    const updatedChildren = (childType === 'sons' ? [...sons] : [...daughters]).map((child, i) => {
+      if (i === index) {
+        return { ...child, [field]: value };
+      }
+      return child;
+    });
+
+    if (childType === 'sons') {
+      setSons(updatedChildren);
+    } else {
+      setDaughters(updatedChildren);
+    }
   };
 
-  const validateContactNumber = (number: string): boolean => {
-    return /^\d+$/.test(number);
+  const handleMaritalStatusChange = (value: string) => {
+    setFamilyHead(prev => ({ ...prev, maritalStatus: value }));
+    setShowSpouseSection(value === 'married');
   };
 
-  const handleFamilyHeadChange = (field: keyof PersonData, value: string | number) => {
-    setFamilyHead(prev => ({
-      ...prev,
-      [field]: typeof value === 'string' ? value.toUpperCase() : value
-    }));
-  };
-
-  const handleSpouseChange = (field: keyof PersonData, value: string | number) => {
-    setSpouse(prev => ({
-      ...prev,
-      [field]: typeof value === 'string' ? value.toUpperCase() : value
-    }));
-  };
-
-  const generateChildrenForms = (type: 'sons' | 'daughters', count: number) => {
-    const newChildren: PersonData[] = [];
-    for (let i = 0; i < count; i++) {
-      newChildren.push({
-        firstName: '',
-        lastName: '',
-        contactNumber: '',
-        dateOfBirth: '',
-        occupation: '',
-        currentPlace: '',
-        phoneNumber: '',
-        maritalStatus: '',
-        nativePlace: '',
-        spouse: null
+  const handleNumberOfChildrenChange = (type: 'sons' | 'daughters', count: number) => {
+    if (type === 'sons') {
+      setNumberOfSons(count);
+      setSons(prev => {
+        const newSons = Array(count).fill(null).map((_, i) => ({
+          firstName: prev[i]?.firstName || '',
+          lastName: prev[i]?.lastName || '',
+          dateOfBirth: prev[i]?.dateOfBirth || '',
+          age: prev[i]?.age || null,
+          contactNumber: prev[i]?.contactNumber || '',
+          occupation: prev[i]?.occupation || '',
+          currentPlace: prev[i]?.currentPlace || '',
+          phoneNumber: prev[i]?.phoneNumber || '',
+          maritalStatus: prev[i]?.maritalStatus || '',
+          childType: 'sons',
+          childIndex: i,
+        }));
+        return newSons;
+      });
+    } else {
+      setNumberOfDaughters(count);
+      setDaughters(prev => {
+        const newDaughters = Array(count).fill(null).map((_, i) => ({
+          firstName: prev[i]?.firstName || '',
+          lastName: prev[i]?.lastName || '',
+          dateOfBirth: prev[i]?.dateOfBirth || '',
+          age: prev[i]?.age || null,
+          contactNumber: prev[i]?.contactNumber || '',
+          occupation: prev[i]?.occupation || '',
+          currentPlace: prev[i]?.currentPlace || '',
+          phoneNumber: prev[i]?.phoneNumber || '',
+          maritalStatus: prev[i]?.maritalStatus || '',
+          childType: 'daughters',
+          childIndex: i,
+        }));
+        return newDaughters;
       });
     }
-    
-    if (type === 'sons') {
-      setSons(newChildren);
-    } else {
-      setDaughters(newChildren);
-    }
   };
 
-  const updateChild = (type: 'sons' | 'daughters', index: number, field: keyof PersonData, value: string) => {
-    const updateFunction = type === 'sons' ? setSons : setDaughters;
-    
-    updateFunction(prev => prev.map((child, i) => 
-      i === index 
-        ? { ...child, [field]: typeof value === 'string' ? value.toUpperCase() : value }
-        : child
-    ));
-  };
-
-  const submitForm = async () => {
-    console.log('=== STARTING FORM SUBMISSION ===');
-    console.log('Family head data:', familyHead);
-    console.log('Spouse data:', spouse);
-    console.log('Sons data:', sons);
-    console.log('Daughters data:', daughters);
-
-    // Basic validation
-    if (!familyHead.firstName || !familyHead.lastName || !familyHead.dateOfBirth) {
-      toast.error('Please fill in family head details');
-      return;
-    }
-
+  const handleSubmit = async () => {
     try {
-      // Calculate age for family head
-      const headAge = calculateAge(familyHead.dateOfBirth);
-      
-      // Insert family head with proper error handling
+      // Validate Family Head
+      if (!familyHead.firstName || !familyHead.lastName || !familyHead.dateOfBirth) {
+        toast.error('Please fill in all required fields for Family Head.');
+        return;
+      }
+
+      // Validate Spouse if Marital Status is Married
+      if (familyHead.maritalStatus === 'married' && (!spouse.firstName || !spouse.lastName)) {
+        toast.error('Please fill in all required fields for Spouse.');
+        return;
+      }
+
+      // Insert Family Head
       const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
-        .insert({
+        .insert([{
           first_name: familyHead.firstName,
           last_name: familyHead.lastName,
           date_of_birth: familyHead.dateOfBirth,
-          age: headAge,
-          native_place: familyHead.nativePlace || null,
-          current_place: familyHead.currentPlace || null,
-          contact_number: familyHead.contactNumber || null,
-          marital_status: familyHead.maritalStatus as any,
-          occupation: familyHead.occupation as any || null
-        })
+          age: calculateAge(familyHead.dateOfBirth),
+          contact_number: familyHead.contactNumber,
+          native_place: familyHead.nativePlace,
+          current_place: familyHead.currentPlace,
+          marital_status: familyHead.maritalStatus,
+          occupation: familyHead.occupation,
+        }])
         .select()
-        .single();
 
       if (familyHeadError) {
-        console.error('Family head insertion error:', familyHeadError);
-        throw familyHeadError;
+        console.error('Family Head Error:', familyHeadError);
+        toast.error('Failed to save family head information.');
+        return;
       }
 
-      console.log('Family head inserted successfully:', familyHeadData);
-      const familyHeadId = familyHeadData.id;
+      const familyHeadId = familyHeadData?.[0]?.id;
 
-      // Insert spouse if married
-      if (familyHead.maritalStatus === 'married' && (spouse.firstName || spouse.lastName)) {
-        const spouseAge = spouse.dateOfBirth ? calculateAge(spouse.dateOfBirth) : null;
-        
+      // Insert Spouse if Marital Status is Married
+      if (familyHead.maritalStatus === 'married' && familyHeadId) {
         const { error: spouseError } = await supabase
           .from('spouses')
-          .insert({
+          .insert([{
+            first_name: spouse.firstName,
+            last_name: spouse.lastName,
+            date_of_birth: spouse.dateOfBirth,
+            age: calculateAge(spouse.dateOfBirth),
+            contact_number: spouse.contactNumber,
+            native_place: spouse.nativePlace,
+            occupation: spouse.occupation,
+            number_of_sons: numberOfSons,
+            number_of_daughters: numberOfDaughters,
             family_head_id: familyHeadId,
-            first_name: spouse.firstName || null,
-            last_name: spouse.lastName || null,
-            date_of_birth: spouse.dateOfBirth || null,
-            age: spouseAge,
-            native_place: spouse.nativePlace || null,
-            contact_number: spouse.contactNumber || null,
-            occupation: spouse.occupation as any || null,
-            number_of_sons: spouse.numberOfSons || 0,
-            number_of_daughters: spouse.numberOfDaughters || 0
-          });
+          }]);
 
         if (spouseError) {
-          console.error('Spouse insertion error:', spouseError);
-          throw spouseError;
-        }
-        console.log('Spouse inserted successfully');
-      }
-
-      // Insert children (sons and daughters)
-      const allChildren = [
-        ...sons.map((son, index) => ({ ...son, child_type: 'son', child_index: index })),
-        ...daughters.map((daughter, index) => ({ ...daughter, child_type: 'daughter', child_index: index }))
-      ];
-
-      for (const child of allChildren) {
-        if (!child.firstName && !child.lastName) continue;
-
-        const childAge = child.dateOfBirth ? calculateAge(child.dateOfBirth) : null;
-        
-        const { error: childError } = await supabase
-          .from('children')
-          .insert({
-            family_head_id: familyHeadId,
-            first_name: child.firstName || null,
-            last_name: child.lastName || null,
-            contact_number: child.contactNumber || null,
-            date_of_birth: child.dateOfBirth || null,
-            age: childAge,
-            occupation: child.occupation as any || null,
-            current_place: child.currentPlace || null,
-            phone_number: child.phoneNumber || null,
-            marital_status: child.maritalStatus as any || null,
-            child_type: child.child_type,
-            child_index: child.child_index
-          });
-
-        if (childError) {
-          console.error('Child insertion error:', childError);
-          throw childError;
+          console.error('Spouse Error:', spouseError);
+          toast.error('Failed to save spouse information.');
+          return;
         }
       }
 
-      console.log('=== ALL DATA SAVED SUCCESSFULLY ===');
-      toast.success('Family information has been saved successfully!');
-      
-      // Reset form
-      setFamilyHead({
-        firstName: '',
-        lastName: '',
-        dateOfBirth: '',
-        nativePlace: '',
-        currentPlace: '',
-        contactNumber: '',
-        maritalStatus: '',
-        occupation: ''
-      });
-      setSpouse({
-        firstName: '',
-        lastName: '',
-        dateOfBirth: '',
-        nativePlace: '',
-        currentPlace: '',
-        contactNumber: '',
-        maritalStatus: '',
-        occupation: '',
-        numberOfSons: 0,
-        numberOfDaughters: 0
-      });
-      setSons([]);
-      setDaughters([]);
-      
+      // Insert Children (Sons)
+      if (familyHeadId) {
+        for (const son of sons) {
+          const { error: sonError } = await supabase
+            .from('children')
+            .insert([{
+              first_name: son.firstName,
+              last_name: son.lastName,
+              date_of_birth: son.dateOfBirth,
+              age: calculateAge(son.dateOfBirth),
+              contact_number: son.contactNumber,
+              child_type: 'sons',
+              child_index: son.childIndex,
+              occupation: son.occupation,
+              current_place: son.currentPlace,
+              phone_number: son.phoneNumber,
+              marital_status: son.maritalStatus,
+              family_head_id: familyHeadId,
+            }]);
+
+          if (sonError) {
+            console.error('Son Error:', sonError);
+            toast.error(`Failed to save son ${son.childIndex + 1} information.`);
+            return;
+          }
+        }
+      }
+
+      // Insert Children (Daughters)
+      if (familyHeadId) {
+        for (const daughter of daughters) {
+          const { error: daughterError } = await supabase
+            .from('children')
+            .insert([{
+              first_name: daughter.firstName,
+              last_name: daughter.lastName,
+              date_of_birth: daughter.dateOfBirth,
+              age: calculateAge(daughter.dateOfBirth),
+              contact_number: daughter.contactNumber,
+              child_type: 'daughters',
+              child_index: daughter.childIndex,
+              occupation: daughter.occupation,
+              current_place: daughter.currentPlace,
+              phone_number: daughter.phoneNumber,
+              marital_status: daughter.maritalStatus,
+              family_head_id: familyHeadId,
+            }]);
+
+          if (daughterError) {
+            console.error('Daughter Error:', daughterError);
+            toast.error(`Failed to save daughter ${daughter.childIndex + 1} information.`);
+            return;
+          }
+        }
+      }
+
+      toast.success('Family information saved successfully!');
     } catch (error) {
-      console.error('=== FORM SUBMISSION ERROR ===', error);
-      toast.error(`Failed to save family information: ${(error as Error).message}`);
-    }
-  };
-
-  const handleDownloadRequest = () => {
-    setShowPasswordDialog(true);
-    setPassword('');
-  };
-
-  const handlePasswordSubmit = async () => {
-    if (password !== '3575') {
-      toast.error('Incorrect password');
-      return;
-    }
-    
-    setShowPasswordDialog(false);
-    await downloadFormData();
-  };
-
-  const downloadFormData = async () => {
-    try {
-      // Fetch all data from Supabase
-      const { data: familyHeads, error: familyHeadsError } = await supabase
-        .from('family_heads')
-        .select('*');
-      
-      if (familyHeadsError) throw familyHeadsError;
-
-      const { data: spouses, error: spousesError } = await supabase
-        .from('spouses')
-        .select('*');
-      
-      if (spousesError) throw spousesError;
-
-      const { data: children, error: childrenError } = await supabase
-        .from('children')
-        .select('*');
-      
-      if (childrenError) throw childrenError;
-
-      // Format data for Excel with dd/mm/yyyy dates
-      const familyHeadsFormatted = familyHeads?.map(head => ({
-        ID: head.id,
-        'First Name': head.first_name || '',
-        'Last Name': head.last_name || '',
-        'Date of Birth': formatDateToDDMMYYYY(head.date_of_birth),
-        Age: head.age || '',
-        'Native Place': head.native_place || '',
-        'Current Place': head.current_place || '',
-        'Contact Number': head.contact_number || '',
-        'Marital Status': head.marital_status || '',
-        Occupation: head.occupation || '',
-        'Created At': formatDateToDDMMYYYY(head.created_at)
-      })) || [];
-
-      const spousesFormatted = spouses?.map(spouse => ({
-        ID: spouse.id,
-        'Family Head ID': spouse.family_head_id,
-        'First Name': spouse.first_name || '',
-        'Last Name': spouse.last_name || '',
-        'Date of Birth': formatDateToDDMMYYYY(spouse.date_of_birth),
-        Age: spouse.age || '',
-        'Native Place': spouse.native_place || '',
-        'Contact Number': spouse.contact_number || '',
-        Occupation: spouse.occupation || '',
-        'Number of Sons': spouse.number_of_sons || 0,
-        'Number of Daughters': spouse.number_of_daughters || 0,
-        'Created At': formatDateToDDMMYYYY(spouse.created_at)
-      })) || [];
-
-      const childrenFormatted = children?.map(child => ({
-        ID: child.id,
-        'Family Head ID': child.family_head_id,
-        'First Name': child.first_name || '',
-        'Last Name': child.last_name || '',
-        'Date of Birth': formatDateToDDMMYYYY(child.date_of_birth),
-        Age: child.age || '',
-        'Contact Number': child.contact_number || '',
-        'Current Place': child.current_place || '',
-        'Phone Number': child.phone_number || '',
-        Occupation: child.occupation || '',
-        'Marital Status': child.marital_status || '',
-        'Child Type': child.child_type || '',
-        'Child Index': child.child_index || '',
-        'Created At': formatDateToDDMMYYYY(child.created_at)
-      })) || [];
-
-      // Create workbook
-      const workbook = XLSX.utils.book_new();
-      
-      // Add worksheets
-      const familyHeadsSheet = XLSX.utils.json_to_sheet(familyHeadsFormatted);
-      const spousesSheet = XLSX.utils.json_to_sheet(spousesFormatted);
-      const childrenSheet = XLSX.utils.json_to_sheet(childrenFormatted);
-      
-      XLSX.utils.book_append_sheet(workbook, familyHeadsSheet, 'Family Heads');
-      XLSX.utils.book_append_sheet(workbook, spousesSheet, 'Spouses');
-      XLSX.utils.book_append_sheet(workbook, childrenSheet, 'Children');
-
-      // Generate Excel file
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      
-      // Download file
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `family_data_${new Date().toISOString().split('T')[0]}.xlsx`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('Family data downloaded successfully!');
-    } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Failed to download data');
+      console.error('Submission Error:', error);
+      toast.error('An error occurred while saving family information.');
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-background rounded-lg shadow-lg">
-      {/* Download Button - Make it more prominent */}
-      <div className="mb-8 p-4 bg-muted rounded-lg border-2 border-primary/20">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">Export Data</h3>
-            <p className="text-sm text-muted-foreground">Download all family data in Excel format</p>
-          </div>
-          <Button
-            onClick={handleDownloadRequest}
-            variant="default"
-            size="lg"
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-          >
-            <Download size={20} />
-            Download Excel
-          </Button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Family Information Form</h2>
+          <p className="text-gray-600">Please fill out the details for your family members</p>
         </div>
+        <ExportButton />
       </div>
 
-      {/* Password Dialog */}
-      {showPasswordDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background p-6 rounded-lg shadow-lg max-w-sm w-full mx-4 border">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">Enter Password</h3>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-transparent mb-4 bg-background text-foreground"
-              placeholder="Enter password"
-              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-            />
-            <div className="flex gap-2 justify-end">
-              <Button
-                onClick={() => setShowPasswordDialog(false)}
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button onClick={handlePasswordSubmit}>
-                Download
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={(e) => { e.preventDefault(); submitForm(); }}>
-        {/* Family Head Section */}
-        <div className="mb-8 p-6 border rounded-lg">
-          <h2 className="text-2xl font-bold mb-4 text-blue-800">Family Head Information</h2>
+      <Card>
+        <CardHeader>
+          <CardTitle>Family Head Information</CardTitle>
+          <CardDescription>Enter details of the family head</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                First Name / पहिले नाव *
-              </label>
-              <input
-                type="text"
+              <Label htmlFor="headFirstName">First Name</Label>
+              <Input
+                id="headFirstName"
                 value={familyHead.firstName}
-                onChange={(e) => handleFamilyHeadChange('firstName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                required
+                onChange={(e) => handleInputChange(e, 'familyHead', 'firstName')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name / आडनाव *
-              </label>
-              <input
-                type="text"
+              <Label htmlFor="headLastName">Last Name</Label>
+              <Input
+                id="headLastName"
                 value={familyHead.lastName}
-                onChange={(e) => handleFamilyHeadChange('lastName', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                required
+                onChange={(e) => handleInputChange(e, 'familyHead', 'lastName')}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth / जन्म तारीख *
-              </label>
-              <input
-                type="date"
-                value={familyHead.dateOfBirth}
-                onChange={(e) => handleFamilyHeadChange('dateOfBirth', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-              {familyHead.dateOfBirth && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Age: {calculateAge(familyHead.dateOfBirth)}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Native Place / मूळ गाव
-              </label>
-              <input
-                type="text"
-                value={familyHead.nativePlace}
-                onChange={(e) => handleFamilyHeadChange('nativePlace', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Current Place / सध्याचे ठिकाण
-              </label>
-              <input
-                type="text"
-                value={familyHead.currentPlace}
-                onChange={(e) => handleFamilyHeadChange('currentPlace', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Number / संपर्क क्रमांक
-              </label>
-              <input
-                type="text"
-                value={familyHead.contactNumber}
-                onChange={(e) => handleFamilyHeadChange('contactNumber', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-              />
-              {familyHead.contactNumber && !validateContactNumber(familyHead.contactNumber) && (
-                <div className="text-red-500 text-sm mt-1">
-                  Contact number must contain only numbers
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Marital Status / वैवाहिक स्थिती *
-              </label>
-              <select
-                value={familyHead.maritalStatus}
-                onChange={(e) => handleFamilyHeadChange('maritalStatus', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                <option value="single">Single / अविवाहित</option>
-                <option value="married">Married / विवाहित</option>
-                <option value="divorced">Divorced / घटस्फोटित</option>
-                <option value="widowed">Widowed / विधवा</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Occupation / व्यवसाय
-              </label>
-              <select
-                value={familyHead.occupation}
-                onChange={(e) => handleFamilyHeadChange('occupation', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select occupation / व्यवसाय निवडा</option>
-                <option value="retired">Retired / निवृत्त</option>
-                <option value="housewife">Housewife / गृहिणी</option>
-                <option value="salaried">Salaried / नोकरदार</option>
-                <option value="business">Business / व्यवसाय</option>
-              </select>
             </div>
           </div>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="headDateOfBirth">Date of Birth</Label>
+              <Input
+                type="date"
+                id="headDateOfBirth"
+                value={familyHead.dateOfBirth}
+                onChange={(e) => handleInputChange(e, 'familyHead', 'dateOfBirth')}
+              />
+            </div>
+            <div>
+              <Label htmlFor="headContactNumber">Contact Number</Label>
+              <Input
+                id="headContactNumber"
+                value={familyHead.contactNumber}
+                onChange={(e) => handleInputChange(e, 'familyHead', 'contactNumber')}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="headNativePlace">Native Place</Label>
+              <Input
+                id="headNativePlace"
+                value={familyHead.nativePlace}
+                onChange={(e) => handleInputChange(e, 'familyHead', 'nativePlace')}
+              />
+            </div>
+            <div>
+              <Label htmlFor="headCurrentPlace">Current Place</Label>
+              <Input
+                id="headCurrentPlace"
+                value={familyHead.currentPlace}
+                onChange={(e) => handleInputChange(e, 'familyHead', 'currentPlace')}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="headMaritalStatus">Marital Status</Label>
+              <Select onValueChange={handleMaritalStatusChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select marital status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single</SelectItem>
+                  <SelectItem value="married">Married</SelectItem>
+                  <SelectItem value="divorced">Divorced</SelectItem>
+                  <SelectItem value="widowed">Widowed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="headOccupation">Occupation</Label>
+              <Input
+                id="headOccupation"
+                value={familyHead.occupation}
+                onChange={(e) => handleInputChange(e, 'familyHead', 'occupation')}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Spouse Section */}
-        {familyHead.maritalStatus === 'married' && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Spouse Information</h2>
+      {showSpouseSection && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Spouse Information</CardTitle>
+            <CardDescription>Enter details of the spouse</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name / पहिले नाव
-                </label>
-                <input
-                  type="text"
+                <Label htmlFor="spouseFirstName">First Name</Label>
+                <Input
+                  id="spouseFirstName"
                   value={spouse.firstName}
-                  onChange={(e) => handleSpouseChange('firstName', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                  onChange={(e) => handleInputChange(e, 'spouse', 'firstName')}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name / आडनाव
-                </label>
-                <input
-                  type="text"
+                <Label htmlFor="spouseLastName">Last Name</Label>
+                <Input
+                  id="spouseLastName"
                   value={spouse.lastName}
-                  onChange={(e) => handleSpouseChange('lastName', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                  onChange={(e) => handleInputChange(e, 'spouse', 'lastName')}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date of Birth / जन्म तारीख
-                </label>
-                <input
-                  type="date"
-                  value={spouse.dateOfBirth}
-                  onChange={(e) => handleSpouseChange('dateOfBirth', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {spouse.dateOfBirth && (
-                  <div className="text-sm text-gray-600 mt-1">
-                    Age: {calculateAge(spouse.dateOfBirth)}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Native Place / मूळ गाव
-                </label>
-                <input
-                  type="text"
-                  value={spouse.nativePlace}
-                  onChange={(e) => handleSpouseChange('nativePlace', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter native place / मूळ गाव प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Number / संपर्क क्रमांक
-                </label>
-                <input
-                  type="text"
-                  value={spouse.contactNumber}
-                  onChange={(e) => handleSpouseChange('contactNumber', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Occupation / व्यवसाय
-                </label>
-                <select
-                  value={spouse.occupation}
-                  onChange={(e) => handleSpouseChange('occupation', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select occupation / व्यवसाय निवडा</option>
-                  <option value="retired">Retired / निवृत्त</option>
-                  <option value="housewife">Housewife / गृहिणी</option>
-                  <option value="salaried">Salaried / नोकरदार</option>
-                  <option value="business">Business / व्यवसाय</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Sons / मुलांची संख्या
-                </label>
-                <select
-                  value={spouse.numberOfSons || 0}
-                  onChange={(e) => {
-                    const count = parseInt(e.target.value);
-                    handleSpouseChange('numberOfSons', count);
-                    generateChildrenForms('sons', count);
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {[...Array(11)].map((_, i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Daughters / मुलींची संख्या
-                </label>
-                <select
-                  value={spouse.numberOfDaughters || 0}
-                  onChange={(e) => {
-                    const count = parseInt(e.target.value);
-                    handleSpouseChange('numberOfDaughters', count);
-                    generateChildrenForms('daughters', count);
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {[...Array(11)].map((_, i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
               </div>
             </div>
-          </div>
-        )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="spouseDateOfBirth">Date of Birth</Label>
+                <Input
+                  type="date"
+                  id="spouseDateOfBirth"
+                  value={spouse.dateOfBirth}
+                  onChange={(e) => handleInputChange(e, 'spouse', 'dateOfBirth')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="spouseContactNumber">Contact Number</Label>
+                <Input
+                  id="spouseContactNumber"
+                  value={spouse.contactNumber}
+                  onChange={(e) => handleInputChange(e, 'spouse', 'contactNumber')}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="spouseNativePlace">Native Place</Label>
+                <Input
+                  id="spouseNativePlace"
+                  value={spouse.nativePlace}
+                  onChange={(e) => handleInputChange(e, 'spouse', 'nativePlace')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="spouseOccupation">Occupation</Label>
+                <Input
+                  id="spouseOccupation"
+                  value={spouse.occupation}
+                  onChange={(e) => handleInputChange(e, 'spouse', 'occupation')}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="numberOfSons">Number of Sons</Label>
+                <Select onValueChange={(value) => handleNumberOfChildrenChange('sons', parseInt(value))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select number of sons" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...Array(11)].map((_, i) => (
+                      <SelectItem key={i} value={i.toString()}>{i}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="numberOfDaughters">Number of Daughters</Label>
+                <Select onValueChange={(value) => handleNumberOfChildrenChange('daughters', parseInt(value))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select number of daughters" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...Array(11)].map((_, i) => (
+                      <SelectItem key={i} value={i.toString()}>{i}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Sons Section */}
-        {sons.length > 0 && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Sons Information</h2>
+      {numberOfSons > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sons Information</CardTitle>
+            <CardDescription>Enter details of the sons</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
             {sons.map((son, index) => (
-              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Son {index + 1}</h3>
+              <div key={`son-${index}`} className="space-y-4 border p-4 rounded-md">
+                <Separator />
+                <h3 className="text-lg font-semibold">Son {index + 1}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name / पहिले नाव
-                    </label>
-                    <input
-                      type="text"
+                    <Label htmlFor={`sonFirstName-${index}`}>First Name</Label>
+                    <Input
+                      id={`sonFirstName-${index}`}
                       value={son.firstName}
-                      onChange={(e) => updateChild('sons', index, 'firstName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
+                      onChange={(e) => handleChildInputChange(index, 'firstName', e.target.value, 'sons')}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name / आडनाव
-                    </label>
-                    <input
-                      type="text"
+                    <Label htmlFor={`sonLastName-${index}`}>Last Name</Label>
+                    <Input
+                      id={`sonLastName-${index}`}
                       value={son.lastName}
-                      onChange={(e) => updateChild('sons', index, 'lastName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
+                      onChange={(e) => handleChildInputChange(index, 'lastName', e.target.value, 'sons')}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Birth / जन्म तारीख
-                    </label>
-                    <input
-                      type="date"
-                      value={son.dateOfBirth}
-                      onChange={(e) => updateChild('sons', index, 'dateOfBirth', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {son.dateOfBirth && (
-                      <div className="text-sm text-gray-600 mt-1">
-                        Age: {calculateAge(son.dateOfBirth)}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Number / संपर्क क्रमांक
-                    </label>
-                    <input
-                      type="text"
-                      value={son.contactNumber}
-                      onChange={(e) => updateChild('sons', index, 'contactNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Place / सध्याचे ठिकाण
-                    </label>
-                    <input
-                      type="text"
-                      value={son.currentPlace}
-                      onChange={(e) => updateChild('sons', index, 'currentPlace', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number / फोन नंबर
-                    </label>
-                    <input
-                      type="text"
-                      value={son.phoneNumber || ''}
-                      onChange={(e) => updateChild('sons', index, 'phoneNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Occupation / व्यवसाय
-                    </label>
-                    <select
-                      value={son.occupation}
-                      onChange={(e) => updateChild('sons', index, 'occupation', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select occupation / व्यवसाय निवडा</option>
-                      <option value="salaried">Salaried / नोकरदार</option>
-                      <option value="business">Business / व्यवसाय</option>
-                      <option value="student">Student / विद्यार्थी</option>
-                      <option value="unemployed">Unemployed / बेरोजगार</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Marital Status / वैवाहिक स्थिती
-                    </label>
-                    <select
-                      value={son.maritalStatus}
-                      onChange={(e) => updateChild('sons', index, 'maritalStatus', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                      <option value="single">Single / अविवाहित</option>
-                      <option value="married">Married / विवाहित</option>
-                      <option value="divorced">Divorced / घटस्फोटित</option>
-                      <option value="widowed">Widowed / विधवा</option>
-                    </select>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Daughters Section */}
-        {daughters.length > 0 && (
-          <div className="mb-8 p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4 text-blue-800">Daughters Information</h2>
-            {daughters.map((daughter, index) => (
-              <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Daughter {index + 1}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name / पहिले नाव
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.firstName}
-                      onChange={(e) => updateChild('daughters', index, 'firstName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter first name / पहिले नाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name / आडनाव
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.lastName}
-                      onChange={(e) => updateChild('daughters', index, 'lastName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter last name / आडनाव प्रविष्ट करा"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Birth / जन्म तारीख
-                    </label>
-                    <input
+                    <Label htmlFor={`sonDateOfBirth-${index}`}>Date of Birth</Label>
+                    <Input
                       type="date"
-                      value={daughter.dateOfBirth}
-                      onChange={(e) => updateChild('daughters', index, 'dateOfBirth', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {daughter.dateOfBirth && (
-                      <div className="text-sm text-gray-600 mt-1">
-                        Age: {calculateAge(daughter.dateOfBirth)}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Number / संपर्क क्रमांक
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.contactNumber}
-                      onChange={(e) => updateChild('daughters', index, 'contactNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter contact number / संपर्क क्रमांक प्रविष्ट करा"
+                      id={`sonDateOfBirth-${index}`}
+                      value={son.dateOfBirth}
+                      onChange={(e) => handleChildInputChange(index, 'dateOfBirth', e.target.value, 'sons')}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Place / सध्याचे ठिकाण
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.currentPlace}
-                      onChange={(e) => updateChild('daughters', index, 'currentPlace', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter current place / सध्याचे ठिकाण प्रविष्ट करा"
+                    <Label htmlFor={`sonContactNumber-${index}`}>Contact Number</Label>
+                    <Input
+                      id={`sonContactNumber-${index}`}
+                      value={son.contactNumber}
+                      onChange={(e) => handleChildInputChange(index, 'contactNumber', e.target.value, 'sons')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`sonOccupation-${index}`}>Occupation</Label>
+                    <Input
+                      id={`sonOccupation-${index}`}
+                      value={son.occupation}
+                      onChange={(e) => handleChildInputChange(index, 'occupation', e.target.value, 'sons')}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number / फोन नंबर
-                    </label>
-                    <input
-                      type="text"
-                      value={daughter.phoneNumber || ''}
-                      onChange={(e) => updateChild('daughters', index, 'phoneNumber', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter phone number / फोन नंबर प्रविष्ट करा"
+                    <Label htmlFor={`sonCurrentPlace-${index}`}>Current Place</Label>
+                    <Input
+                      id={`sonCurrentPlace-${index}`}
+                      value={son.currentPlace}
+                      onChange={(e) => handleChildInputChange(index, 'currentPlace', e.target.value, 'sons')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`sonPhoneNumber-${index}`}>Phone Number</Label>
+                    <Input
+                      id={`sonPhoneNumber-${index}`}
+                      value={son.phoneNumber}
+                      onChange={(e) => handleChildInputChange(index, 'phoneNumber', e.target.value, 'sons')}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Occupation / व्यवसाय
-                    </label>
-                    <select
-                      value={daughter.occupation}
-                      onChange={(e) => updateChild('daughters', index, 'occupation', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select occupation / व्यवसाय निवडा</option>
-                      <option value="salaried">Salaried / नोकरदार</option>
-                      <option value="business">Business / व्यवसाय</option>
-                      <option value="student">Student / विद्यार्थी</option>
-                      <option value="unemployed">Unemployed / बेरोजगार</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Marital Status / वैवाहिक स्थिती
-                    </label>
-                    <select
-                      value={daughter.maritalStatus}
-                      onChange={(e) => updateChild('daughters', index, 'maritalStatus', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select marital status / वैवाहिक स्थिती निवडा</option>
-                      <option value="single">Single / अविवाहित</option>
-                      <option value="married">Married / विवाहित</option>
-                      <option value="divorced">Divorced / घटस्फोटित</option>
-                      <option value="widowed">Widowed / विधवा</option>
-                    </select>
+                    <Label htmlFor={`sonMaritalStatus-${index}`}>Marital Status</Label>
+                    <Input
+                      id={`sonMaritalStatus-${index}`}
+                      value={son.maritalStatus}
+                      onChange={(e) => handleChildInputChange(index, 'maritalStatus', e.target.value, 'sons')}
+                    />
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Submit Button */}
-        <div className="text-center flex gap-4 justify-center">
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105"
-          >
-            Submit Family Information / कुटुंब माहिती सबमिट करा
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadRequest}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 transform hover:scale-105 flex items-center gap-2"
-          >
-            <Download size={20} />
-            Download Data / डेटा डाउनलोड करा
-          </button>
-        </div>
-      </form>
+      {numberOfDaughters > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Daughters Information</CardTitle>
+            <CardDescription>Enter details of the daughters</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {daughters.map((daughter, index) => (
+              <div key={`daughter-${index}`} className="space-y-4 border p-4 rounded-md">
+                <Separator />
+                <h3 className="text-lg font-semibold">Daughter {index + 1}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`daughterFirstName-${index}`}>First Name</Label>
+                    <Input
+                      id={`daughterFirstName-${index}`}
+                      value={daughter.firstName}
+                      onChange={(e) => handleChildInputChange(index, 'firstName', e.target.value, 'daughters')}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`daughterLastName-${index}`}>Last Name</Label>
+                    <Input
+                      id={`daughterLastName-${index}`}
+                      value={daughter.lastName}
+                      onChange={(e) => handleChildInputChange(index, 'lastName', e.target.value, 'daughters')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`daughterDateOfBirth-${index}`}>Date of Birth</Label>
+                    <Input
+                      type="date"
+                      id={`daughterDateOfBirth-${index}`}
+                      value={daughter.dateOfBirth}
+                      onChange={(e) => handleChildInputChange(index, 'dateOfBirth', e.target.value, 'daughters')}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`daughterContactNumber-${index}`}>Contact Number</Label>
+                    <Input
+                      id={`daughterContactNumber-${index}`}
+                      value={daughter.contactNumber}
+                      onChange={(e) => handleChildInputChange(index, 'contactNumber', e.target.value, 'daughters')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`daughterOccupation-${index}`}>Occupation</Label>
+                    <Input
+                      id={`daughterOccupation-${index}`}
+                      value={daughter.occupation}
+                      onChange={(e) => handleChildInputChange(index, 'occupation', e.target.value, 'daughters')}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`daughterCurrentPlace-${index}`}>Current Place</Label>
+                    <Input
+                      id={`daughterCurrentPlace-${index}`}
+                      value={daughter.currentPlace}
+                      onChange={(e) => handleChildInputChange(index, 'currentPlace', e.target.value, 'daughters')}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`daughterPhoneNumber-${index}`}>Phone Number</Label>
+                    <Input
+                      id={`daughterPhoneNumber-${index}`}
+                      value={daughter.phoneNumber}
+                      onChange={(e) => handleChildInputChange(index, 'phoneNumber', e.target.value, 'daughters')}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`daughterMaritalStatus-${index}`}>Marital Status</Label>
+                    <Input
+                      id={`daughterMaritalStatus-${index}`}
+                      value={daughter.maritalStatus}
+                      onChange={(e) => handleChildInputChange(index, 'maritalStatus', e.target.value, 'daughters')}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Button onClick={handleSubmit}>Submit</Button>
     </div>
   );
 };
