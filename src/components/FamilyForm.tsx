@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -153,14 +154,14 @@ const FamilyForm = () => {
 
   const handleSubmit = async () => {
     try {
-      // Insert Family Head (even with incomplete data)
+      // Insert Family Head (even with incomplete data, no authentication required)
       const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
         .insert({
           first_name: familyHead.firstName || '',
           last_name: familyHead.lastName || '',
           date_of_birth: familyHead.dateOfBirth || null,
-          age: familyHead.dateOfBirth ? calculateAge(new Date(familyHead.dateOfBirth)) : null,
+          age: familyHead.dateOfBirth ? calculateAge(new Date(familyHead.dateOfBirth)) : 0,
           contact_number: familyHead.contactNumber || null,
           native_place: familyHead.nativePlace || null,
           current_place: familyHead.currentPlace || null,
@@ -259,7 +260,7 @@ const FamilyForm = () => {
         }
       }
 
-      toast.success('Family information saved successfully (including incomplete data)!');
+      toast.success('Family information saved successfully!');
     } catch (error) {
       console.error('Submission Error:', error);
       toast.error('An error occurred while saving family information.');
