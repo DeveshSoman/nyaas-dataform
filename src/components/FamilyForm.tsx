@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -125,7 +126,7 @@ const FamilyForm = () => {
           currentPlace: prev[i]?.currentPlace || '',
           phoneNumber: prev[i]?.phoneNumber || '',
           maritalStatus: prev[i]?.maritalStatus || '',
-          childType: 'sons',
+          childType: 'sons' as const,
           childIndex: i,
         }));
         return newSons;
@@ -143,7 +144,7 @@ const FamilyForm = () => {
           currentPlace: prev[i]?.currentPlace || '',
           phoneNumber: prev[i]?.phoneNumber || '',
           maritalStatus: prev[i]?.maritalStatus || '',
-          childType: 'daughters',
+          childType: 'daughters' as const,
           childIndex: i,
         }));
         return newDaughters;
@@ -168,17 +169,17 @@ const FamilyForm = () => {
       // Insert Family Head
       const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
-        .insert([{
+        .insert({
           first_name: familyHead.firstName,
           last_name: familyHead.lastName,
           date_of_birth: familyHead.dateOfBirth,
-          age: calculateAge(familyHead.dateOfBirth),
+          age: calculateAge(new Date(familyHead.dateOfBirth)),
           contact_number: familyHead.contactNumber,
           native_place: familyHead.nativePlace,
           current_place: familyHead.currentPlace,
-          marital_status: familyHead.maritalStatus,
-          occupation: familyHead.occupation,
-        }])
+          marital_status: familyHead.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
+          occupation: familyHead.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
+        })
         .select()
 
       if (familyHeadError) {
@@ -193,18 +194,18 @@ const FamilyForm = () => {
       if (familyHead.maritalStatus === 'married' && familyHeadId) {
         const { error: spouseError } = await supabase
           .from('spouses')
-          .insert([{
+          .insert({
             first_name: spouse.firstName,
             last_name: spouse.lastName,
             date_of_birth: spouse.dateOfBirth,
-            age: calculateAge(spouse.dateOfBirth),
+            age: calculateAge(new Date(spouse.dateOfBirth)),
             contact_number: spouse.contactNumber,
             native_place: spouse.nativePlace,
-            occupation: spouse.occupation,
+            occupation: spouse.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
             number_of_sons: numberOfSons,
             number_of_daughters: numberOfDaughters,
             family_head_id: familyHeadId,
-          }]);
+          });
 
         if (spouseError) {
           console.error('Spouse Error:', spouseError);
@@ -218,20 +219,20 @@ const FamilyForm = () => {
         for (const son of sons) {
           const { error: sonError } = await supabase
             .from('children')
-            .insert([{
+            .insert({
               first_name: son.firstName,
               last_name: son.lastName,
               date_of_birth: son.dateOfBirth,
-              age: calculateAge(son.dateOfBirth),
+              age: calculateAge(new Date(son.dateOfBirth)),
               contact_number: son.contactNumber,
               child_type: 'sons',
               child_index: son.childIndex,
-              occupation: son.occupation,
+              occupation: son.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
               current_place: son.currentPlace,
               phone_number: son.phoneNumber,
-              marital_status: son.maritalStatus,
+              marital_status: son.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
               family_head_id: familyHeadId,
-            }]);
+            });
 
           if (sonError) {
             console.error('Son Error:', sonError);
@@ -246,20 +247,20 @@ const FamilyForm = () => {
         for (const daughter of daughters) {
           const { error: daughterError } = await supabase
             .from('children')
-            .insert([{
+            .insert({
               first_name: daughter.firstName,
               last_name: daughter.lastName,
               date_of_birth: daughter.dateOfBirth,
-              age: calculateAge(daughter.dateOfBirth),
+              age: calculateAge(new Date(daughter.dateOfBirth)),
               contact_number: daughter.contactNumber,
               child_type: 'daughters',
               child_index: daughter.childIndex,
-              occupation: daughter.occupation,
+              occupation: daughter.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
               current_place: daughter.currentPlace,
               phone_number: daughter.phoneNumber,
-              marital_status: daughter.maritalStatus,
+              marital_status: daughter.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
               family_head_id: familyHeadId,
-            }]);
+            });
 
           if (daughterError) {
             console.error('Daughter Error:', daughterError);
