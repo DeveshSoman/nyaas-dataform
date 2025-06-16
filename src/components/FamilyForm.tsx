@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -154,31 +153,19 @@ const FamilyForm = () => {
 
   const handleSubmit = async () => {
     try {
-      // Validate Family Head
-      if (!familyHead.firstName || !familyHead.lastName || !familyHead.dateOfBirth) {
-        toast.error('Please fill in all required fields for Family Head.');
-        return;
-      }
-
-      // Validate Spouse if Marital Status is Married
-      if (familyHead.maritalStatus === 'married' && (!spouse.firstName || !spouse.lastName)) {
-        toast.error('Please fill in all required fields for Spouse.');
-        return;
-      }
-
-      // Insert Family Head
+      // Insert Family Head (even with incomplete data)
       const { data: familyHeadData, error: familyHeadError } = await supabase
         .from('family_heads')
         .insert({
-          first_name: familyHead.firstName,
-          last_name: familyHead.lastName,
-          date_of_birth: familyHead.dateOfBirth,
-          age: calculateAge(new Date(familyHead.dateOfBirth)),
-          contact_number: familyHead.contactNumber,
-          native_place: familyHead.nativePlace,
-          current_place: familyHead.currentPlace,
-          marital_status: familyHead.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
-          occupation: familyHead.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
+          first_name: familyHead.firstName || '',
+          last_name: familyHead.lastName || '',
+          date_of_birth: familyHead.dateOfBirth || null,
+          age: familyHead.dateOfBirth ? calculateAge(new Date(familyHead.dateOfBirth)) : null,
+          contact_number: familyHead.contactNumber || null,
+          native_place: familyHead.nativePlace || null,
+          current_place: familyHead.currentPlace || null,
+          marital_status: (familyHead.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed') || 'single',
+          occupation: (familyHead.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed') || null,
         })
         .select()
 
@@ -190,18 +177,18 @@ const FamilyForm = () => {
 
       const familyHeadId = familyHeadData?.[0]?.id;
 
-      // Insert Spouse if Marital Status is Married
-      if (familyHead.maritalStatus === 'married' && familyHeadId) {
+      // Insert Spouse if any spouse data exists
+      if (familyHead.maritalStatus === 'married' && familyHeadId && (spouse.firstName || spouse.lastName)) {
         const { error: spouseError } = await supabase
           .from('spouses')
           .insert({
-            first_name: spouse.firstName,
-            last_name: spouse.lastName,
-            date_of_birth: spouse.dateOfBirth,
-            age: calculateAge(new Date(spouse.dateOfBirth)),
-            contact_number: spouse.contactNumber,
-            native_place: spouse.nativePlace,
-            occupation: spouse.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
+            first_name: spouse.firstName || '',
+            last_name: spouse.lastName || '',
+            date_of_birth: spouse.dateOfBirth || null,
+            age: spouse.dateOfBirth ? calculateAge(new Date(spouse.dateOfBirth)) : null,
+            contact_number: spouse.contactNumber || null,
+            native_place: spouse.nativePlace || null,
+            occupation: (spouse.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed') || null,
             number_of_sons: numberOfSons,
             number_of_daughters: numberOfDaughters,
             family_head_id: familyHeadId,
@@ -214,63 +201,65 @@ const FamilyForm = () => {
         }
       }
 
-      // Insert Children (Sons)
-      if (familyHeadId) {
+      // Insert Children (Sons) - even with incomplete data
+      if (familyHeadId && sons.length > 0) {
         for (const son of sons) {
-          const { error: sonError } = await supabase
-            .from('children')
-            .insert({
-              first_name: son.firstName,
-              last_name: son.lastName,
-              date_of_birth: son.dateOfBirth,
-              age: calculateAge(new Date(son.dateOfBirth)),
-              contact_number: son.contactNumber,
-              child_type: 'sons',
-              child_index: son.childIndex,
-              occupation: son.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
-              current_place: son.currentPlace,
-              phone_number: son.phoneNumber,
-              marital_status: son.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
-              family_head_id: familyHeadId,
-            });
+          if (son.firstName || son.lastName) { // Only save if at least one name field has data
+            const { error: sonError } = await supabase
+              .from('children')
+              .insert({
+                first_name: son.firstName || '',
+                last_name: son.lastName || '',
+                date_of_birth: son.dateOfBirth || null,
+                age: son.dateOfBirth ? calculateAge(new Date(son.dateOfBirth)) : null,
+                contact_number: son.contactNumber || null,
+                child_type: 'sons',
+                child_index: son.childIndex,
+                occupation: (son.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed') || null,
+                current_place: son.currentPlace || null,
+                phone_number: son.phoneNumber || null,
+                marital_status: (son.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed') || 'single',
+                family_head_id: familyHeadId,
+              });
 
-          if (sonError) {
-            console.error('Son Error:', sonError);
-            toast.error(`Failed to save son ${son.childIndex + 1} information.`);
-            return;
+            if (sonError) {
+              console.error('Son Error:', sonError);
+              toast.error(`Failed to save son ${son.childIndex + 1} information.`);
+            }
           }
         }
       }
 
-      // Insert Children (Daughters)
-      if (familyHeadId) {
+      // Insert Children (Daughters) - even with incomplete data
+      if (familyHeadId && daughters.length > 0) {
         for (const daughter of daughters) {
-          const { error: daughterError } = await supabase
-            .from('children')
-            .insert({
-              first_name: daughter.firstName,
-              last_name: daughter.lastName,
-              date_of_birth: daughter.dateOfBirth,
-              age: calculateAge(new Date(daughter.dateOfBirth)),
-              contact_number: daughter.contactNumber,
-              child_type: 'daughters',
-              child_index: daughter.childIndex,
-              occupation: daughter.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed',
-              current_place: daughter.currentPlace,
-              phone_number: daughter.phoneNumber,
-              marital_status: daughter.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed',
-              family_head_id: familyHeadId,
-            });
+          if (daughter.firstName || daughter.lastName) { // Only save if at least one name field has data
+            const { error: daughterError } = await supabase
+              .from('children')
+              .insert({
+                first_name: daughter.firstName || '',
+                last_name: daughter.lastName || '',
+                date_of_birth: daughter.dateOfBirth || null,
+                age: daughter.dateOfBirth ? calculateAge(new Date(daughter.dateOfBirth)) : null,
+                contact_number: daughter.contactNumber || null,
+                child_type: 'daughters',
+                child_index: daughter.childIndex,
+                occupation: (daughter.occupation as 'retired' | 'housewife' | 'salaried' | 'business' | 'student' | 'unemployed') || null,
+                current_place: daughter.currentPlace || null,
+                phone_number: daughter.phoneNumber || null,
+                marital_status: (daughter.maritalStatus as 'single' | 'married' | 'divorced' | 'widowed') || 'single',
+                family_head_id: familyHeadId,
+              });
 
-          if (daughterError) {
-            console.error('Daughter Error:', daughterError);
-            toast.error(`Failed to save daughter ${daughter.childIndex + 1} information.`);
-            return;
+            if (daughterError) {
+              console.error('Daughter Error:', daughterError);
+              toast.error(`Failed to save daughter ${daughter.childIndex + 1} information.`);
+            }
           }
         }
       }
 
-      toast.success('Family information saved successfully!');
+      toast.success('Family information saved successfully (including incomplete data)!');
     } catch (error) {
       console.error('Submission Error:', error);
       toast.error('An error occurred while saving family information.');
